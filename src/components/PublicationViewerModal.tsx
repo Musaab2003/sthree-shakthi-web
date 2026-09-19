@@ -107,32 +107,51 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const parsed = publication.embedUrl ? parseDocumentOrFlipbookUrl(publication.embedUrl) : null;
   const effectivePdfUrl = blobUrl || parsed?.embedUrl || (publication.embedUrl ? publication.embedUrl : null);
 
-  const handleShareClick = async (e: React.MouseEvent) => {
+  const handleShareClick = async (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     const shareUrl = window.location.href;
     if (navigator.share) {
       try {
         await navigator.share({
           title: publication.title,
-          text: `Check out "${publication.title}" on Project Sthree Shakthi`,
+          text: `Read "${publication.title}" on Project Sthree Shakthi`,
           url: shareUrl,
         });
         return;
-      } catch (err) {}
+      } catch (err) {
+        // User cancelled or share failed, fallback to clipboard
+      }
     }
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
+    
+    // Fallback to clipboard copy
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        // Legacy fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setCopiedToast(true);
       setTimeout(() => setCopiedToast(false), 2500);
+    } catch (e) {
+      console.warn('Copy failed:', e);
     }
   };
 
-  const handleHeartClick = (e: React.MouseEvent) => {
+  const handleHeartClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     const result = storageService.toggleLikePublication(publication.id);
     setLikesCount(result.likes);
     setHasLiked(result.isLiked);
-    onLike(publication.id, e);
+    onLike(publication.id, e as React.MouseEvent);
   };
 
   const isWordType = publication.type === 'word' || 
@@ -159,7 +178,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const isArticleType = !isWordType && !isPdfType && !isFlipbookType;
 
   return (
-    <div className={`fixed inset-0 z-[80] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-3 md:p-6`}>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-3 md:p-6">
       <div 
         className={`relative w-full flex flex-col overflow-hidden bg-white shadow-2xl transition-all duration-300 border border-[#F4E5DA] ${
           isFullScreen ? 'h-full w-full max-w-[1920px] rounded-none sm:rounded-3xl' : 'max-w-5xl h-[100dvh] sm:h-[92vh] rounded-none sm:rounded-[32px]'
@@ -168,14 +187,14 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       >
         {/* Share notification banner */}
         {copiedToast && (
-          <div className="absolute top-16 right-6 z-50 px-4 py-2 rounded-2xl bg-[#3E1028] text-white text-xs font-bold shadow-xl border border-[#D95F7F] flex items-center gap-2 animate-in slide-in-from-top duration-200">
-            <Check className="w-4 h-4 text-emerald-400" />
+          <div className="absolute top-16 right-4 sm:right-6 z-50 px-4 py-2 rounded-2xl bg-[#3E1028] text-white text-xs font-bold shadow-xl border border-[#D95F7F] flex items-center gap-2 animate-in slide-in-from-top duration-200">
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Link copied to clipboard!</span>
           </div>
         )}
 
         {/* Modal Top Navigation Bar */}
-        <div className="flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 border-b border-[#F4E5DA] bg-[#FAF2EB] gap-2">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-4 border-b border-[#F4E5DA] bg-[#FAF2EB] gap-2 shrink-0 select-none">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 pr-1 sm:pr-4">
             <span className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
               isWordType ? 'bg-blue-600 text-white' : 'bg-[#D95F7F] text-white'
@@ -204,17 +223,17 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {publication.embedUrl && (
               <a
                 href={publication.embedUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-slate-100 border border-[#F4E5DA] shadow-2xs"
+                className="hidden md:flex items-center gap-1 px-3 py-1.5 sm:py-2 rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-slate-100 border border-[#F4E5DA] shadow-2xs cursor-pointer touch-manipulation active:scale-95"
                 title="Open original source in new tab"
               >
                 <ExternalLink className="w-3.5 h-3.5 text-[#D95F7F]" />
-                <span className="hidden md:inline">Open Link</span>
+                <span>Open Link</span>
               </a>
             )}
 
@@ -222,7 +241,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
             <button
               type="button"
               onClick={handleShareClick}
-              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 ${
+              className={`flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 min-h-[36px] rounded-full text-xs font-bold border transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer touch-manipulation ${
                 copiedToast 
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
                   : 'bg-white text-[#3E1028] hover:bg-slate-100 border-[#F4E5DA]'
@@ -230,7 +249,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               title="Share publication"
             >
               {copiedToast ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-[#D95F7F]" />}
-              <span className="hidden md:inline">{copiedToast ? 'Copied' : 'Share'}</span>
+              <span className="hidden sm:inline">{copiedToast ? 'Copied' : 'Share'}</span>
             </button>
 
             {/* Heart Like Button (Only in Public View) */}
@@ -238,15 +257,15 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               <button
                 type="button"
                 onClick={handleHeartClick}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-xs font-bold transition-all shadow-2xs border hover:scale-105 active:scale-95 ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 min-h-[36px] rounded-full text-xs font-bold transition-all shadow-2xs border hover:scale-105 active:scale-95 cursor-pointer touch-manipulation ${
                   hasLiked || likesCount > 0
                     ? 'bg-rose-50 text-[#D95F7F] border-[#D95F7F]/40'
                     : 'bg-white text-[#D95F7F] hover:bg-rose-50 border-[#F4E5DA]'
                 }`}
-                title="Like this publication"
+                title={hasLiked ? 'Unlike this publication' : 'Like this publication'}
               >
                 <Heart className={`w-3.5 h-3.5 transition-transform ${hasLiked ? 'scale-125 fill-[#D95F7F] text-[#D95F7F]' : likesCount > 0 ? 'fill-[#D95F7F] text-[#D95F7F]' : ''}`} />
-                <span className="text-xs">{likesCount}</span>
+                <span className="text-xs font-semibold">{likesCount}</span>
               </button>
             )}
 
@@ -254,7 +273,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
             <button
               type="button"
               onClick={() => setIsFullScreen(!isFullScreen)}
-              className="p-1.5 sm:p-2 rounded-full text-[#5C1D3B] hover:text-[#3E1028] hover:bg-white/80 transition-colors"
+              className="p-2 sm:p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full text-[#5C1D3B] hover:text-[#3E1028] hover:bg-white/80 transition-colors cursor-pointer touch-manipulation active:scale-95"
               title={isFullScreen ? 'Exit Full Screen' : 'Expand to Full Screen'}
             >
               {isFullScreen ? (
@@ -268,7 +287,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 sm:p-2 rounded-full text-[#5C1D3B] hover:text-[#3E1028] hover:bg-white/80 transition-colors"
+              className="p-2 sm:p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full text-[#5C1D3B] hover:text-[#3E1028] hover:bg-white/80 transition-colors cursor-pointer touch-manipulation active:scale-95"
               title="Close modal"
             >
               <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -281,39 +300,51 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
           
           {/* 1. Word Document Mode */}
           {isWordType ? (
-            <div className="flex-grow p-6 sm:p-10 flex flex-col items-center justify-center space-y-6 max-w-2xl mx-auto w-full">
+            <div className="flex-grow p-4 sm:p-10 flex flex-col items-center space-y-6 max-w-3xl mx-auto w-full">
               
-              <div className="w-20 h-20 rounded-3xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner">
-                <FileType className="w-10 h-10" />
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-inner mt-2">
+                <FileType className="w-8 h-8 sm:w-10 sm:h-10" />
               </div>
 
-              <div className="space-y-2 text-center">
+              <div className="space-y-2 text-center w-full px-2">
                 <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-extrabold uppercase tracking-wider border border-blue-200">
                   <FileType className="w-3.5 h-3.5" />
-                  Microsoft Word Document (.docx / .doc)
+                  Microsoft Word Document (.docx)
                 </span>
-                <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#3E1028] pt-1">
+                <h3 className="font-serif text-xl sm:text-3xl font-bold text-[#3E1028] pt-1">
                   {publication.title}
                 </h3>
                 {publication.subtitle && (
-                  <p className="text-sm font-semibold text-[#D95F7F]">
+                  <p className="text-xs sm:text-sm font-semibold text-[#D95F7F]">
                     {publication.subtitle}
                   </p>
                 )}
               </div>
 
               {/* Document Details Card */}
-              <div className="w-full bg-white p-5 rounded-2xl border border-[#F4E5DA] shadow-xs space-y-3 text-xs">
+              <div className="w-full bg-white p-4 sm:p-5 rounded-2xl border border-[#F4E5DA] shadow-xs space-y-3 text-xs">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 border-b border-[#F4E5DA]">
                   <div>
                     <div className="text-[#5C1D3B]/60 text-[10px] font-bold uppercase">Attached Document</div>
-                    <div className="font-mono font-bold text-slate-800 text-sm">{publication.fileName || `${publication.title}.docx`}</div>
+                    <div className="font-mono font-bold text-slate-800 text-xs sm:text-sm break-all">{publication.fileName || `${publication.title}.docx`}</div>
                   </div>
-                  {publication.fileSize && (
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-xs font-semibold">
-                      {publication.fileSize}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {publication.fileSize && (
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-xs font-semibold">
+                        {publication.fileSize}
+                      </span>
+                    )}
+                    {isAdminView && currentFileData && (
+                      <a
+                        href={currentFileData}
+                        download={publication.fileName || `${publication.title}.docx`}
+                        className="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center gap-1 hover:bg-blue-700 transition-colors shadow-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#5C1D3B]/80 pt-1">
@@ -332,23 +363,49 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               </div>
 
               {/* Description / Summary Box */}
-              <div className="w-full bg-white p-5 rounded-2xl border border-[#F4E5DA] text-left space-y-1.5 shadow-xs">
-                <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider">
-                  Summary & Notes
+              {publication.summary && (
+                <div className="w-full bg-white p-4 sm:p-5 rounded-2xl border border-[#F4E5DA] text-left space-y-1.5 shadow-xs">
+                  <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider">
+                    Summary & Overview
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#5C1D3B]/90 leading-relaxed">
+                    {publication.summary}
+                  </p>
                 </div>
-                <p className="text-xs sm:text-sm text-[#5C1D3B]/90 leading-relaxed">
-                  {publication.summary}
-                </p>
-              </div>
+              )}
+
+              {/* Full Blog / Document Body Content if available */}
+              {publication.content && (
+                <div className="w-full bg-white p-5 sm:p-8 rounded-2xl border border-[#F4E5DA] text-left space-y-4 shadow-xs">
+                  <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider border-b border-[#F4E5DA] pb-2">
+                    Document Content & Article Text
+                  </div>
+                  <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-sm">
+                    {publication.content.split('\n\n').map((para, i) => {
+                      if (para.startsWith('### ')) {
+                        return <h3 key={i} className="font-serif text-base sm:text-lg font-bold text-[#3E1028] mt-4 mb-2">{para.replace('### ', '')}</h3>;
+                      }
+                      if (para.startsWith('> ')) {
+                        return (
+                          <blockquote key={i} className="p-3.5 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-xs sm:text-sm my-3">
+                            {para.replace('> ', '')}
+                          </blockquote>
+                        );
+                      }
+                      return <p key={i}>{para}</p>;
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Reading Status & Cloud Link (If available) */}
               {publication.embedUrl && (
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2 w-full">
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2 w-full pb-6">
                   <a
                     href={publication.embedUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all hover:scale-102"
+                    className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all hover:scale-102 touch-manipulation cursor-pointer"
                   >
                     <ExternalLink className="w-4 h-4" />
                     <span>View Word Document Online</span>
@@ -359,25 +416,27 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
           ) : isPdfType ? (
             /* 2. PDF Viewer Mode */
             effectivePdfUrl ? (
-              <div className="w-full flex-grow flex flex-col min-h-[500px] h-[75vh] relative bg-slate-900">
-                <object
-                  data={effectivePdfUrl}
-                  type="application/pdf"
-                  className="w-full flex-grow h-full bg-slate-900 border-0"
-                >
-                  <iframe
-                    src={effectivePdfUrl}
-                    title={publication.title}
-                    className="w-full flex-grow h-full border-0 bg-white"
-                    allow="fullscreen"
-                    onLoad={() => setIframeLoaded(true)}
-                  />
-                </object>
+              <div className="w-full flex-grow flex flex-col min-h-[500px] relative bg-slate-900">
+                <div className="w-full flex-grow h-[65vh] sm:h-[75vh] relative bg-slate-900">
+                  <object
+                    data={effectivePdfUrl}
+                    type="application/pdf"
+                    className="w-full h-full bg-slate-900 border-0"
+                  >
+                    <iframe
+                      src={effectivePdfUrl}
+                      title={publication.title}
+                      className="w-full h-full border-0 bg-white"
+                      allow="fullscreen"
+                      onLoad={() => setIframeLoaded(true)}
+                    />
+                  </object>
+                </div>
 
-                <div className="bg-slate-900 text-slate-300 text-xs px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800">
-                  <span className="text-[11px] text-[#F8CAD5] truncate flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-[#D95F7F]" />
-                    <span>{publication.title} {publication.fileSize ? `(${publication.fileSize})` : ''}</span>
+                <div className="bg-slate-900 text-slate-300 text-xs px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 shrink-0">
+                  <span className="text-[11px] text-[#F8CAD5] truncate flex items-center gap-1.5 max-w-[200px] sm:max-w-none">
+                    <FileText className="w-3.5 h-3.5 text-[#D95F7F] shrink-0" />
+                    <span className="truncate">{publication.title} {publication.fileSize ? `(${publication.fileSize})` : ''}</span>
                   </span>
                   
                   <div className="flex items-center gap-2">
@@ -385,7 +444,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                       <a
                         href={effectivePdfUrl}
                         download={publication.fileName || `${publication.title}.pdf`}
-                        className="px-3.5 py-1.5 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                        className="px-3.5 py-1.5 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs touch-manipulation cursor-pointer"
                       >
                         <Download className="w-3 h-3" />
                         <span>Download PDF</span>
@@ -395,48 +454,74 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                       href={effectivePdfUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition-all flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition-all flex items-center gap-1 touch-manipulation cursor-pointer"
                     >
                       <ExternalLink className="w-3 h-3" />
                       <span>Open in New Tab</span>
                     </a>
                   </div>
                 </div>
+
+                {/* If publication also has written body content, display it below the PDF embed */}
+                {publication.content && (
+                  <div className="bg-white p-6 sm:p-8 border-t border-[#F4E5DA] text-left space-y-4">
+                    <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider border-b border-[#F4E5DA] pb-2">
+                      Accompanying Article & Description
+                    </div>
+                    <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-sm">
+                      {publication.content.split('\n\n').map((para, i) => (
+                        <p key={i}>{para}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              /* PDF Fallback Showcase Card (If direct stream is not yet loaded) */
-              <div className="flex-grow p-6 sm:p-10 flex flex-col items-center justify-center space-y-6 max-w-2xl mx-auto w-full">
-                <div className="w-20 h-20 rounded-3xl bg-rose-100 text-[#D95F7F] flex items-center justify-center shadow-inner">
-                  <FileText className="w-10 h-10" />
+              /* PDF Showcase & Reader Card (When direct base64 stream is external or stored remotely) */
+              <div className="flex-grow p-4 sm:p-10 flex flex-col items-center space-y-6 max-w-3xl mx-auto w-full">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-rose-100 text-[#D95F7F] flex items-center justify-center shadow-inner mt-2">
+                  <FileText className="w-8 h-8 sm:w-10 sm:h-10" />
                 </div>
 
-                <div className="space-y-2 text-center">
+                <div className="space-y-2 text-center w-full px-2">
                   <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-50 text-[#D95F7F] text-xs font-extrabold uppercase tracking-wider border border-rose-200">
                     <FileText className="w-3.5 h-3.5" />
                     PDF Document (.pdf)
                   </span>
-                  <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#3E1028] pt-1">
+                  <h3 className="font-serif text-xl sm:text-3xl font-bold text-[#3E1028] pt-1">
                     {publication.title}
                   </h3>
                   {publication.subtitle && (
-                    <p className="text-sm font-semibold text-[#D95F7F]">
+                    <p className="text-xs sm:text-sm font-semibold text-[#D95F7F]">
                       {publication.subtitle}
                     </p>
                   )}
                 </div>
 
                 {/* Document Details Card */}
-                <div className="w-full bg-white p-5 rounded-2xl border border-[#F4E5DA] shadow-xs space-y-3 text-xs">
+                <div className="w-full bg-white p-4 sm:p-5 rounded-2xl border border-[#F4E5DA] shadow-xs space-y-3 text-xs">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 border-b border-[#F4E5DA]">
                     <div>
                       <div className="text-[#5C1D3B]/60 text-[10px] font-bold uppercase">Attached Document</div>
-                      <div className="font-mono font-bold text-slate-800 text-sm">{publication.fileName || `${publication.title}.pdf`}</div>
+                      <div className="font-mono font-bold text-slate-800 text-xs sm:text-sm break-all">{publication.fileName || `${publication.title}.pdf`}</div>
                     </div>
-                    {publication.fileSize && (
-                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-xs font-semibold">
-                        {publication.fileSize}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {publication.fileSize && (
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-xs font-semibold">
+                          {publication.fileSize}
+                        </span>
+                      )}
+                      {isAdminView && currentFileData && (
+                        <a
+                          href={currentFileData}
+                          download={publication.fileName || `${publication.title}.pdf`}
+                          className="px-3 py-1 rounded-lg bg-[#D95F7F] text-white font-bold text-xs flex items-center gap-1 hover:bg-[#BE4465] transition-colors shadow-xs"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#5C1D3B]/80 pt-1">
@@ -455,14 +540,55 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                 </div>
 
                 {/* Description / Summary Box */}
-                <div className="w-full bg-white p-5 rounded-2xl border border-[#F4E5DA] text-left space-y-1.5 shadow-xs">
-                  <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider">
-                    Summary & Overview
+                {publication.summary && (
+                  <div className="w-full bg-white p-4 sm:p-5 rounded-2xl border border-[#F4E5DA] text-left space-y-1.5 shadow-xs">
+                    <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider">
+                      Summary & Overview
+                    </div>
+                    <p className="text-xs sm:text-sm text-[#5C1D3B]/90 leading-relaxed">
+                      {publication.summary}
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm text-[#5C1D3B]/90 leading-relaxed">
-                    {publication.summary}
-                  </p>
-                </div>
+                )}
+
+                {/* Full Article Content */}
+                {publication.content && (
+                  <div className="w-full bg-white p-5 sm:p-8 rounded-2xl border border-[#F4E5DA] text-left space-y-4 shadow-xs">
+                    <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider border-b border-[#F4E5DA] pb-2">
+                      Full Blog Content
+                    </div>
+                    <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-sm">
+                      {publication.content.split('\n\n').map((para, i) => {
+                        if (para.startsWith('### ')) {
+                          return <h3 key={i} className="font-serif text-base sm:text-lg font-bold text-[#3E1028] mt-4 mb-2">{para.replace('### ', '')}</h3>;
+                        }
+                        if (para.startsWith('> ')) {
+                          return (
+                            <blockquote key={i} className="p-3.5 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-xs sm:text-sm my-3">
+                              {para.replace('> ', '')}
+                            </blockquote>
+                          );
+                        }
+                        return <p key={i}>{para}</p>;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* External URL button if exists */}
+                {publication.embedUrl && (
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2 w-full pb-6">
+                    <a
+                      href={publication.embedUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-xs sm:text-sm font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-lg shadow-[#D95F7F]/30 transition-all hover:scale-102 touch-manipulation cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Open Document in Full Viewer</span>
+                    </a>
+                  </div>
+                )}
               </div>
             )
           ) : isFlipbookType && parsed?.embedUrl ? (
@@ -493,7 +619,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                   href={publication.embedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#F8CAD5] hover:text-white text-[11px] font-bold flex items-center gap-1"
+                  className="text-[#F8CAD5] hover:text-white text-[11px] font-bold flex items-center gap-1 touch-manipulation"
                 >
                   Fullscreen External Reader <ExternalLink className="w-3 h-3" />
                 </a>
@@ -501,21 +627,21 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
             </div>
           ) : (
             /* 4. Word Document / Written Article Mode */
-            <div className="max-w-3xl mx-auto w-full px-6 py-8 space-y-6 bg-white my-4 rounded-3xl shadow-sm border border-[#F4E5DA]">
+            <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white my-2 sm:my-4 rounded-2xl sm:rounded-3xl shadow-sm border border-[#F4E5DA]">
               
               {/* Word Document Banner if applicable */}
               {isWordType && (
                 <div className="p-4 rounded-2xl bg-[#FAF2EB] border border-[#F4E5DA] flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0">
                       DOC
                     </div>
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-[#3E1028]">
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-bold text-[#3E1028] truncate">
                         {publication.fileName || `${publication.title}.docx`}
                       </h4>
-                      <p className="text-[11px] text-[#5C1D3B]/70">
-                        {publication.fileSize || 'Word Document'} • Ready for full reading & download
+                      <p className="text-[10px] sm:text-[11px] text-[#5C1D3B]/70 truncate">
+                        {publication.fileSize || 'Word Document'} • Ready for full reading
                       </p>
                     </div>
                   </div>
@@ -524,20 +650,20 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                     <a
                       href={currentFileData}
                       download={publication.fileName || `${publication.title}.docx`}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all"
+                      className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all shrink-0 touch-manipulation cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Download Document</span>
+                      <span>Download</span>
                     </a>
                   ) : publication.embedUrl ? (
                     <a
                       href={publication.embedUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all"
+                      className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all shrink-0 touch-manipulation cursor-pointer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open Document</span>
+                      <span>Open</span>
                     </a>
                   ) : null}
                 </div>
@@ -556,17 +682,17 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
               {/* Article Header */}
               <div className="space-y-3 border-b border-[#F4E5DA] pb-6">
-                <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#3E1028] leading-tight">
+                <h1 className="font-serif text-xl sm:text-4xl font-bold text-[#3E1028] leading-tight">
                   {publication.title}
                 </h1>
                 
                 {publication.subtitle && (
-                  <p className="text-base text-[#D95F7F] font-medium">
+                  <p className="text-sm sm:text-base text-[#D95F7F] font-medium">
                     {publication.subtitle}
                   </p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-4 text-xs text-[#5C1D3B]/80 pt-2">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[#5C1D3B]/80 pt-2">
                   <span className="font-bold text-[#3E1028]">{publication.authorName}</span>
                   <span>•</span>
                   <span>{publication.authorClub || 'Cluster 05'}</span>
@@ -585,20 +711,22 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               </div>
 
               {/* Summary */}
-              <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] text-xs sm:text-sm text-[#3E1028] leading-relaxed">
-                <strong>Overview:</strong> {publication.summary}
-              </div>
+              {publication.summary && (
+                <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] text-xs sm:text-sm text-[#3E1028] leading-relaxed">
+                  <strong>Overview:</strong> {publication.summary}
+                </div>
+              )}
 
               {/* Article Content */}
               {publication.content && (
-                <div className="text-[#3E1028] leading-relaxed space-y-4 text-sm sm:text-base">
+                <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-base">
                   {publication.content.split('\n\n').map((para, i) => {
                     if (para.startsWith('### ')) {
-                      return <h3 key={i} className="font-serif text-lg font-bold text-[#3E1028] mt-6 mb-2">{para.replace('### ', '')}</h3>;
+                      return <h3 key={i} className="font-serif text-base sm:text-lg font-bold text-[#3E1028] mt-6 mb-2">{para.replace('### ', '')}</h3>;
                     }
                     if (para.startsWith('> ')) {
                       return (
-                        <blockquote key={i} className="p-4 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-sm my-4">
+                        <blockquote key={i} className="p-3.5 sm:p-4 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-xs sm:text-sm my-4">
                           {para.replace('> ', '')}
                         </blockquote>
                       );
