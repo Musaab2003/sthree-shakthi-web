@@ -126,9 +126,26 @@ export const storageService = {
   },
 
   // 4. Submit a new publication (works across all devices via Firebase Cloud sync)
-  async submitPublication(pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>): Promise<{ success: boolean; publication: Publication }> {
+  async submitPublication(
+    pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>,
+    rawFile?: File | Blob
+  ): Promise<{ success: boolean; publication: Publication }> {
     const pubId = `pub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     
+    let finalEmbedUrl = pub.embedUrl;
+    
+    // If rawFile is provided, upload to Firebase Storage for direct high-speed cloud access
+    if (rawFile && pub.fileName) {
+      try {
+        const storageUrl = await firebaseService.uploadPublicationFile(rawFile, pubId, pub.fileName);
+        if (storageUrl) {
+          finalEmbedUrl = storageUrl;
+        }
+      } catch (e) {
+        console.warn('Firebase Storage upload fallback:', e);
+      }
+    }
+
     // Cache heavy fileData in memory and persist in IndexedDB
     if (pub.fileData) {
       fileDataMemoryCache.set(pubId, pub.fileData);
@@ -137,6 +154,7 @@ export const storageService = {
 
     const newPub: Publication = {
       ...pub,
+      embedUrl: finalEmbedUrl,
       id: pubId,
       status: 'pending',
       submittedAt: new Date().toISOString(),
@@ -153,7 +171,7 @@ export const storageService = {
     try {
       const inserted = await firebaseService.insertPublication(newPub);
       if (!inserted && newPub.fileData) {
-        // Fallback: If heavy payload hit network limits, insert metadata and preview
+        // Fallback: If heavy payload hit network limits, insert metadata and embedUrl
         const lightweightPub = { ...newPub, fileData: undefined };
         await firebaseService.insertPublication(lightweightPub);
       }

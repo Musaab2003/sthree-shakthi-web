@@ -15,6 +15,7 @@ import {
   Firestore,
   Unsubscribe 
 } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
 import { Publication, PublicationStatus, FirebaseConfig, AdminAccount } from '../types';
 
 const STORAGE_KEY = 'sthree_shakthi_firebase_config_v1';
@@ -31,6 +32,7 @@ export const DEFAULT_FIREBASE_CONFIG: FirebaseConfig = {
 
 let cachedDb: Firestore | null = null;
 let cachedApp: FirebaseApp | null = null;
+let cachedStorage: FirebaseStorage | null = null;
 
 export const firebaseService = {
   getConfig(): FirebaseConfig {
@@ -83,6 +85,41 @@ export const firebaseService = {
       return cachedDb;
     } catch (err) {
       console.warn('Firebase initialization error:', err);
+      return null;
+    }
+  },
+
+  getStorage(): FirebaseStorage | null {
+    if (cachedStorage) return cachedStorage;
+    const cfg = this.getConfig();
+    if (!cfg.apiKey || !cfg.projectId || !cfg.appId) {
+      return null;
+    }
+    try {
+      if (getApps().length === 0) {
+        cachedApp = initializeApp(cfg);
+      } else {
+        cachedApp = getApp();
+      }
+      cachedStorage = getStorage(cachedApp);
+      return cachedStorage;
+    } catch (err) {
+      console.warn('Firebase Storage initialization error:', err);
+      return null;
+    }
+  },
+
+  async uploadPublicationFile(file: File | Blob, pubId: string, fileName: string): Promise<string | null> {
+    const storage = this.getStorage();
+    if (!storage) return null;
+    try {
+      const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storageRef = ref(storage, `publications/${pubId}/${cleanFileName}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      return downloadUrl;
+    } catch (e) {
+      console.warn('Firebase Storage upload notice:', e);
       return null;
     }
   },

@@ -148,9 +148,11 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
   const handleHeartClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    const result = storageService.toggleLikePublication(publication.id);
-    setLikesCount(result.likes);
-    setHasLiked(result.isLiked);
+    // Optimistic local update
+    const currentlyLiked = hasLiked;
+    setHasLiked(!currentlyLiked);
+    setLikesCount(prev => currentlyLiked ? Math.max(0, prev - 1) : prev + 1);
+    
     onLike(publication.id, e as React.MouseEvent);
   };
 
@@ -424,7 +426,11 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                     className="w-full h-full bg-slate-900 border-0"
                   >
                     <iframe
-                      src={effectivePdfUrl}
+                      src={
+                        effectivePdfUrl.startsWith('http') 
+                          ? `https://docs.google.com/viewer?url=${encodeURIComponent(effectivePdfUrl)}&embedded=true`
+                          : effectivePdfUrl
+                      }
                       title={publication.title}
                       className="w-full h-full border-0 bg-white"
                       allow="fullscreen"
@@ -477,118 +483,181 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                 )}
               </div>
             ) : (
-              /* PDF Showcase & Reader Card (When direct base64 stream is external or stored remotely) */
-              <div className="flex-grow p-4 sm:p-10 flex flex-col items-center space-y-6 max-w-3xl mx-auto w-full">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-rose-100 text-[#D95F7F] flex items-center justify-center shadow-inner mt-2">
-                  <FileText className="w-8 h-8 sm:w-10 sm:h-10" />
-                </div>
-
-                <div className="space-y-2 text-center w-full px-2">
-                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-50 text-[#D95F7F] text-xs font-extrabold uppercase tracking-wider border border-rose-200">
-                    <FileText className="w-3.5 h-3.5" />
-                    PDF Document (.pdf)
-                  </span>
-                  <h3 className="font-serif text-xl sm:text-3xl font-bold text-[#3E1028] pt-1">
-                    {publication.title}
-                  </h3>
-                  {publication.subtitle && (
-                    <p className="text-xs sm:text-sm font-semibold text-[#D95F7F]">
-                      {publication.subtitle}
-                    </p>
-                  )}
-                </div>
-
-                {/* Document Details Card */}
-                <div className="w-full bg-white p-4 sm:p-5 rounded-2xl border border-[#F4E5DA] shadow-xs space-y-3 text-xs">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-3 border-b border-[#F4E5DA]">
-                    <div>
-                      <div className="text-[#5C1D3B]/60 text-[10px] font-bold uppercase">Attached Document</div>
-                      <div className="font-mono font-bold text-slate-800 text-xs sm:text-sm break-all">{publication.fileName || `${publication.title}.pdf`}</div>
+              /* PDF Showcase & Editorial Article Reader (When direct stream is loading or external) */
+              <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white my-2 sm:my-4 rounded-2xl sm:rounded-3xl shadow-sm border border-[#F4E5DA]">
+                
+                {/* PDF Document Notice Banner */}
+                <div className="p-4 rounded-2xl bg-[#FAF2EB] border border-[#F4E5DA] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-[#D95F7F] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0">
+                      PDF
                     </div>
-                    <div className="flex items-center gap-2">
-                      {publication.fileSize && (
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-xs font-semibold">
-                          {publication.fileSize}
-                        </span>
-                      )}
-                      {isAdminView && currentFileData && (
-                        <a
-                          href={currentFileData}
-                          download={publication.fileName || `${publication.title}.pdf`}
-                          className="px-3 py-1 rounded-lg bg-[#D95F7F] text-white font-bold text-xs flex items-center gap-1 hover:bg-[#BE4465] transition-colors shadow-xs"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>Download</span>
-                        </a>
-                      )}
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-bold text-[#3E1028] truncate">
+                        {publication.fileName || `${publication.title}.pdf`}
+                      </h4>
+                      <p className="text-[10px] sm:text-[11px] text-[#5C1D3B]/70 truncate">
+                        {publication.fileSize || 'PDF Publication'} • Official Submission
+                      </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#5C1D3B]/80 pt-1">
-                    <div>
-                      <span className="font-bold text-slate-700">Author:</span> {publication.authorName}
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-700">Email:</span> {publication.authorEmail}
-                    </div>
-                    {publication.authorClub && (
-                      <div className="sm:col-span-2">
-                        <span className="font-bold text-slate-700">Club / Affiliation:</span> {publication.authorClub}
-                      </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {isAdminView && currentFileData && (
+                      <a
+                        href={currentFileData}
+                        download={publication.fileName || `${publication.title}.pdf`}
+                        className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md transition-all shrink-0 touch-manipulation cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download</span>
+                      </a>
+                    )}
+                    {publication.embedUrl && (
+                      <a
+                        href={publication.embedUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md transition-all shrink-0 touch-manipulation cursor-pointer"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Open Document</span>
+                      </a>
                     )}
                   </div>
                 </div>
 
-                {/* Description / Summary Box */}
+                {/* Article Header */}
+                <div className="space-y-3 border-b border-[#F4E5DA] pb-6">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-[#D95F7F] text-xs font-extrabold uppercase tracking-wider border border-rose-200">
+                    <FileText className="w-3.5 h-3.5" />
+                    Editorial Document Publication
+                  </span>
+
+                  <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#3E1028] leading-tight">
+                    {publication.title}
+                  </h1>
+                  
+                  {publication.subtitle && (
+                    <p className="text-sm sm:text-base text-[#D95F7F] font-medium">
+                      {publication.subtitle}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-[#5C1D3B]/80 pt-2">
+                    <span className="font-bold text-[#3E1028]">{publication.authorName}</span>
+                    <span>•</span>
+                    <span>{publication.authorClub || 'Cluster 05 Community'}</span>
+                    <span>•</span>
+                    <span>{new Date(publication.submittedAt).toLocaleDateString()}</span>
+                    {publication.readTimeMinutes && (
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-[#D95F7F]" />
+                          {publication.readTimeMinutes} min read
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Summary / Overview Box */}
                 {publication.summary && (
-                  <div className="w-full bg-white p-4 sm:p-5 rounded-2xl border border-[#F4E5DA] text-left space-y-1.5 shadow-xs">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1.5">
                     <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider">
-                      Summary & Overview
+                      Summary & Executive Overview
                     </div>
-                    <p className="text-xs sm:text-sm text-[#5C1D3B]/90 leading-relaxed">
+                    <p className="text-xs sm:text-sm text-[#3E1028] leading-relaxed">
                       {publication.summary}
                     </p>
                   </div>
                 )}
 
-                {/* Full Article Content */}
-                {publication.content && (
-                  <div className="w-full bg-white p-5 sm:p-8 rounded-2xl border border-[#F4E5DA] text-left space-y-4 shadow-xs">
-                    <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider border-b border-[#F4E5DA] pb-2">
-                      Full Blog Content
+                {/* Article Body Content */}
+                {publication.content ? (
+                  <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-base">
+                    {publication.content.split('\n\n').map((para, i) => {
+                      if (para.startsWith('### ')) {
+                        return <h3 key={i} className="font-serif text-base sm:text-lg font-bold text-[#3E1028] mt-6 mb-2">{para.replace('### ', '')}</h3>;
+                      }
+                      if (para.startsWith('> ')) {
+                        return (
+                          <blockquote key={i} className="p-3.5 sm:p-4 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-xs sm:text-sm my-4">
+                            {para.replace('> ', '')}
+                          </blockquote>
+                        );
+                      }
+                      return <p key={i}>{para}</p>;
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#F4E5DA] text-center space-y-4 shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#D95F7F] flex items-center justify-center mx-auto">
+                      <BookOpen className="w-6 h-6" />
                     </div>
-                    <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-sm">
-                      {publication.content.split('\n\n').map((para, i) => {
-                        if (para.startsWith('### ')) {
-                          return <h3 key={i} className="font-serif text-base sm:text-lg font-bold text-[#3E1028] mt-4 mb-2">{para.replace('### ', '')}</h3>;
-                        }
-                        if (para.startsWith('> ')) {
-                          return (
-                            <blockquote key={i} className="p-3.5 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-xs sm:text-sm my-3">
-                              {para.replace('> ', '')}
-                            </blockquote>
-                          );
-                        }
-                        return <p key={i}>{para}</p>;
-                      })}
+                    <div className="space-y-1 max-w-md mx-auto">
+                      <h4 className="font-serif text-base font-bold text-[#3E1028]">
+                        Complete Document Submitted
+                      </h4>
+                      <p className="text-xs text-[#5C1D3B]/80 leading-relaxed">
+                        This work was submitted by <strong>{publication.authorName}</strong> as a comprehensive document publication.
+                      </p>
                     </div>
+
+                    {publication.embedUrl && (
+                      <div className="pt-2">
+                        <a
+                          href={publication.embedUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/20 transition-all hover:scale-102"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open Full Document Online</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* External URL button if exists */}
-                {publication.embedUrl && (
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2 w-full pb-6">
-                    <a
-                      href={publication.embedUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-full text-xs sm:text-sm font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-lg shadow-[#D95F7F]/30 transition-all hover:scale-102 touch-manipulation cursor-pointer"
+                {/* Footer Interaction Bar */}
+                <div className="pt-6 border-t border-[#F4E5DA] flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {!isAdminView && (
+                      <button
+                        type="button"
+                        onClick={handleHeartClick}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all border ${
+                          hasLiked 
+                            ? 'bg-rose-50 text-[#D95F7F] border-[#D95F7F]/40' 
+                            : 'bg-[#FAF2EB] text-[#5C1D3B] hover:text-[#D95F7F] border-[#F4E5DA]'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${hasLiked ? 'fill-[#D95F7F] text-[#D95F7F]' : ''}`} />
+                        <span>{hasLiked ? 'Liked' : 'Like'} ({likesCount})</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleShareClick}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold bg-[#FAF2EB] text-[#5C1D3B] hover:text-[#3E1028] border border-[#F4E5DA] transition-all"
                     >
-                      <ExternalLink className="w-4 h-4" />
-                      <span>Open Document in Full Viewer</span>
-                    </a>
+                      <Share2 className="w-4 h-4 text-[#D95F7F]" />
+                      <span>Share</span>
+                    </button>
                   </div>
-                )}
+
+                  {publication.tags && publication.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {publication.tags.map((tag) => (
+                        <span key={tag} className="px-3 py-1 rounded-full bg-[#FAF2EB] text-[#D95F7F] text-xs font-bold border border-[#F4E5DA]">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )
           ) : isFlipbookType && parsed?.embedUrl ? (

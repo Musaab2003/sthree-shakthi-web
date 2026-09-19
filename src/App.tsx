@@ -97,8 +97,8 @@ export function App() {
     setViewingPublication(pub);
   };
 
-  const handleLike = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleLike = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const result = storageService.toggleLikePublication(id);
     const updated = storageService.getAllPublications();
     setAllPublications(updated);
@@ -110,8 +110,11 @@ export function App() {
     }
   };
 
-  const handleSubmitPublication = async (pubData: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>) => {
-    await storageService.submitPublication(pubData);
+  const handleSubmitPublication = async (
+    pubData: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>,
+    rawFile?: File | null
+  ) => {
+    await storageService.submitPublication(pubData, rawFile || undefined);
     const updated = storageService.getAllPublications();
     setAllPublications(updated);
   };

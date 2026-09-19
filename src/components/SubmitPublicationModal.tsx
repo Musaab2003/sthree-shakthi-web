@@ -13,7 +13,7 @@ import { Publication, PublicationType } from '../types';
 interface SubmitPublicationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>) => Promise<any> | void;
+  onSubmit: (pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>, rawFile?: File | null) => Promise<any> | void;
 }
 
 const DEFAULT_COVER = '/campaign-poster.jpg';
@@ -34,6 +34,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
   const [content, setContent] = useState('');
   
   // File upload states
+  const [rawFile, setRawFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
   const [fileData, setFileData] = useState<string>('');
@@ -64,6 +65,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
       setType('pdf');
     }
 
+    setRawFile(file);
     setFileName(file.name);
     setFileSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
 
@@ -81,6 +83,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
   };
 
   const handleClearFile = () => {
+    setRawFile(null);
     setFileName('');
     setFileSize('');
     setFileData('');
@@ -126,8 +129,8 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
         fileData: fileData || undefined,
         coverImage: DEFAULT_COVER,
         tags: ['SthreeShakthi', 'Cluster05'],
-        readTimeMinutes: Math.max(3, Math.ceil(summary.length / 200) + 2)
-      });
+        readTimeMinutes: Math.max(3, Math.ceil((content.length || summary.length) / 200) + 2)
+      }, rawFile);
 
       setSubmissionId(generatedId);
       setSubmittedSuccess(true);
@@ -148,6 +151,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     setSummary('');
     setEmbedUrl('');
     setContent('');
+    setRawFile(null);
     setFileName('');
     setFileSize('');
     setFileData('');
@@ -454,6 +458,23 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
+                />
+              </div>
+
+              {/* Full Blog / Story Text */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#3E1028]">
+                    Blog Story / Article Body <span className="text-slate-400 font-normal">(Optional for documents)</span>
+                  </label>
+                  <span className="text-[10px] text-[#5C1D3B]/70">Supports Markdown & Paragraphs</span>
+                </div>
+                <textarea
+                  rows={6}
+                  placeholder="Paste or write the full text of your blog/article here so visitors can read it directly online..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30 leading-relaxed font-sans"
                 />
               </div>
 
