@@ -19,13 +19,13 @@ import { Publication, PublicationStatus, FirebaseConfig } from '../types';
 const STORAGE_KEY = 'sthree_shakthi_firebase_config_v1';
 
 export const DEFAULT_FIREBASE_CONFIG: FirebaseConfig = {
-  apiKey: ((import.meta as any).env?.VITE_FIREBASE_API_KEY as string) || '',
-  authDomain: ((import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN as string) || '',
-  projectId: ((import.meta as any).env?.VITE_FIREBASE_PROJECT_ID as string) || '',
-  storageBucket: ((import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET as string) || '',
-  messagingSenderId: ((import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || '',
-  appId: ((import.meta as any).env?.VITE_FIREBASE_APP_ID as string) || '',
-  measurementId: ((import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID as string) || ''
+  apiKey: ((import.meta as any).env?.VITE_FIREBASE_API_KEY as string) || 'AIzaSyBwDsJa5SD4CICvHpGszWUB9b5h5sYnih0',
+  authDomain: ((import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN as string) || 'tsl-sri-shakthi.firebaseapp.com',
+  projectId: ((import.meta as any).env?.VITE_FIREBASE_PROJECT_ID as string) || 'tsl-sri-shakthi',
+  storageBucket: ((import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET as string) || 'tsl-sri-shakthi.firebasestorage.app',
+  messagingSenderId: ((import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || '790098341477',
+  appId: ((import.meta as any).env?.VITE_FIREBASE_APP_ID as string) || '1:790098341477:web:4a6c1b01977ab10949608c',
+  measurementId: ((import.meta as any).env?.VITE_FIREBASE_MEASUREMENT_ID as string) || 'G-JE3JKBCM97'
 };
 
 let cachedDb: Firestore | null = null;
