@@ -21,7 +21,7 @@ const DEFAULT_ADMIN: AdminAccount = {
 const DEFAULT_DB_CONFIG: DatabaseConfig = {
   type: 'turso',
   databaseUrl: 'libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io',
-  authToken: '',
+  authToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODk3OTYxNTQsImlkIjoiMDFhMDdmMmEtM2EwMS03NmY0LWI2ZGUtYzE5YzU3OTY1ZDQ0Iiwia2lkIjoiY1JfdV81RVNLVXJFWTZWejNXMXFXbk5MVGNKeHU2cWZnajlXaFVJOU9MWSIsInJpZCI6ImY5YzUyZGI3LTBhNTItNDhhZC04YWU1LTg5MWZmOWVmYjdlNyJ9.lvfBa8bP0CZHqvzFW1Y1Ush4P5d7iopZKTFarkKjye56R5i7CDbFtqyspyZECyxUSqccoveHtdGbOEANOuZuCw',
   connected: true,
   lastSyncedAt: new Date().toISOString()
 };
@@ -404,24 +404,29 @@ export const storageService = {
       const remotePubs = await tursoService.syncAllPublications();
       let currentPubs = this.getAllPublications();
       
-      if (remotePubs && Array.isArray(remotePubs)) {
-        const mergedMap = new Map<string, Publication>();
-        remotePubs.forEach(p => mergedMap.set(p.id, p));
+      if (remotePubs !== null && Array.isArray(remotePubs)) {
+        const cloudMap = new Map<string, Publication>();
+        remotePubs.forEach(p => cloudMap.set(p.id, p));
+
+        // Preserve any recent locally-submitted pending items (< 60s) not yet in cloud response
+        const now = Date.now();
         currentPubs.forEach(p => {
-          if (!mergedMap.has(p.id)) {
-            mergedMap.set(p.id, p);
+          const isRecentlySubmitted = p.submittedAt && (now - new Date(p.submittedAt).getTime() < 60000);
+          if (p.status === 'pending' && isRecentlySubmitted && !cloudMap.has(p.id)) {
+            cloudMap.set(p.id, p);
           }
         });
-        currentPubs = Array.from(mergedMap.values());
+
+        currentPubs = Array.from(cloudMap.values());
+        currentPubs.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
         safeSavePublications(currentPubs);
       }
 
       // 2. Sync remote subscribers from Turso Cloud
       const remoteSubs = await tursoService.syncSubscribers();
       let currentSubs = this.getSubscribers();
-      if (remoteSubs && Array.isArray(remoteSubs)) {
-        const set = new Set([...currentSubs, ...remoteSubs]);
-        currentSubs = Array.from(set);
+      if (remoteSubs !== null && Array.isArray(remoteSubs)) {
+        currentSubs = remoteSubs;
         localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(currentSubs));
       }
 
