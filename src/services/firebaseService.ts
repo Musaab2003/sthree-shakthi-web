@@ -358,15 +358,16 @@ export const firebaseService = {
       if (snap.empty) return [];
       return snap.docs.map(d => {
         const data = d.data();
+        const user = (data.username || d.id || '').trim().toLowerCase();
         return {
-          username: d.id,
+          username: user,
           email: data.email || '',
           passwordHash: data.passwordHash || data.password || '',
           updatedAt: data.updatedAt || new Date().toISOString()
         };
       });
     } catch (e) {
-      console.warn('Error fetching admins from Firebase:', e);
+      console.warn('Error fetching admins from Firestore:', e);
       return [];
     }
   },

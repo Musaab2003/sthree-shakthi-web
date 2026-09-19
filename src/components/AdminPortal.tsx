@@ -81,26 +81,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       return false;
     }
   });
-  const [usernameInput, setUsernameInput] = useState('admin');
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<PublicationStatus | 'all' | 'files' | 'settings' | 'newsletter' | 'database'>('pending');
+  const [activeTab, setActiveTab] = useState<PublicationStatus | 'all' | 'files' | 'settings' | 'newsletter'>('pending');
   const [folderFilter, setFolderFilter] = useState<'all' | 'pdf' | 'word' | 'article'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState<boolean>(true);
 
-  // Firebase Cloud Database State
-  const [fbConfig, setFbConfig] = useState<FirebaseConfig>(() => firebaseService.getConfig());
-  const [fbApiKey, setFbApiKey] = useState(fbConfig.apiKey || '');
-  const [fbAuthDomain, setFbAuthDomain] = useState(fbConfig.authDomain || '');
-  const [fbProjectId, setFbProjectId] = useState(fbConfig.projectId || '');
-  const [fbStorageBucket, setFbStorageBucket] = useState(fbConfig.storageBucket || '');
-  const [fbMessagingSenderId, setFbMessagingSenderId] = useState(fbConfig.messagingSenderId || '');
-  const [fbAppId, setFbAppId] = useState(fbConfig.appId || '');
-  const [showFbApiKey, setShowFbApiKey] = useState(false);
-  const [showAdvancedDbSettings, setShowAdvancedDbSettings] = useState(false);
-  const [dbTestResult, setDbTestResult] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message: string }>({ status: 'idle', message: '' });
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [syncNotice, setSyncNotice] = useState('');
 
@@ -139,14 +128,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setAdminAccount(acc);
     setEditUsername(acc.username);
     setAllAdmins(storageService.getAllAdmins());
-    const cfg = firebaseService.getConfig();
-    setFbConfig(cfg);
-    setFbApiKey(cfg.apiKey || '');
-    setFbProjectId(cfg.projectId || '');
-    setFbAppId(cfg.appId || '');
-    setFbAuthDomain(cfg.authDomain || '');
-    setFbStorageBucket(cfg.storageBucket || '');
-    setFbMessagingSenderId(cfg.messagingSenderId || '');
     setSubscribers(storageService.getSubscribers());
     setBroadcastHistory(storageService.getBroadcastHistory());
 
@@ -260,7 +241,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setNewPassword('');
     setConfirmPassword('');
     setLiveHashPreview('');
-    setSettingsSuccess('✅ Admin credentials updated & synchronized with Firebase Firestore!');
+    setSettingsSuccess('✅ Admin credentials updated & synchronized securely!');
     setTimeout(() => setSettingsSuccess(''), 4000);
   };
 
@@ -284,7 +265,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setNewAdminUser('');
     setNewAdminEmail('');
     setNewAdminPass('');
-    setAdminOpNotice(`✅ New admin "${cleanUser}" created and saved to Firebase Cloud!`);
+    setAdminOpNotice(`✅ New admin "${cleanUser}" created and synced successfully!`);
     setTimeout(() => setAdminOpNotice(''), 4000);
   };
 
@@ -293,7 +274,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       alert('Cannot delete the last primary admin account.');
       return;
     }
-    if (confirm(`Are you sure you want to remove admin "${username}" from Firebase?`)) {
+    if (confirm(`Are you sure you want to remove administrator "${username}"?`)) {
       storageService.deleteAdminAccount(username);
       setAllAdmins(storageService.getAllAdmins());
       setAdminOpNotice(`Admin "${username}" removed.`);
@@ -356,55 +337,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setTimeout(() => setCopiedBroadcastToast(false), 2500);
   };
 
-  const handleTestCloudConnection = async () => {
-    setDbTestResult({ status: 'testing', message: 'Testing real-time connection to Firebase Cloud Firestore...' });
-    const cfg: FirebaseConfig = {
-      apiKey: fbApiKey.trim(),
-      authDomain: fbAuthDomain.trim(),
-      projectId: fbProjectId.trim(),
-      storageBucket: fbStorageBucket.trim(),
-      messagingSenderId: fbMessagingSenderId.trim(),
-      appId: fbAppId.trim(),
-    };
-    firebaseService.saveConfig(cfg);
-    const res = await firebaseService.testConnection();
-    if (res.success) {
-      setDbTestResult({ 
-        status: 'success', 
-        message: res.message
-      });
-    } else {
-      setDbTestResult({ 
-        status: 'error', 
-        message: res.message
-      });
-    }
-  };
-
-  const handleSaveDbSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cfg: FirebaseConfig = {
-      apiKey: fbApiKey.trim(),
-      authDomain: fbAuthDomain.trim(),
-      projectId: fbProjectId.trim(),
-      storageBucket: fbStorageBucket.trim(),
-      messagingSenderId: fbMessagingSenderId.trim(),
-      appId: fbAppId.trim(),
-    };
-    firebaseService.saveConfig(cfg);
-    setFbConfig(cfg);
-    setSyncNotice('Firebase configuration saved successfully!');
-    setTimeout(() => setSyncNotice(''), 3000);
-    handleTestCloudConnection();
-  };
-
   const handleForceCloudSync = async () => {
     setIsSyncingCloud(true);
-    setSyncNotice('Connecting to Firebase Cloud Firestore & syncing submissions across devices...');
+    setSyncNotice('Connecting to Cloud Database & syncing submissions across devices...');
     const result = await storageService.syncFromCloud();
     setSubscribers(result.subscribers);
     setIsSyncingCloud(false);
-    setSyncNotice(`✅ Synced with Firebase Cloud! ${result.publications.length} publication(s) and ${result.subscribers.length} subscriber(s) loaded.`);
+    setSyncNotice(`✅ Cloud sync complete! ${result.publications.length} publication(s) and ${result.subscribers.length} subscriber(s) loaded.`);
     setTimeout(() => setSyncNotice(''), 4000);
   };
 
@@ -471,7 +410,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       } catch {}
       setAuthError('');
     } else {
-      setAuthError('Incorrect username or password. Default: admin / admin123');
+      setAuthError('Invalid username or password.');
     }
   };
 
@@ -482,27 +421,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     } catch {}
     setPasswordInput('');
     setAuthError('');
-  };
-
-  const handleQuickFillAdmin = () => {
-    setUsernameInput('admin');
-    setPasswordInput('admin123');
-    setAuthError('');
-  };
-
-  const handleEmergencyResetCredentials = () => {
-    const defaultAcc: AdminAccount = {
-      username: 'admin',
-      email: 'admin@cluster05.org',
-      passwordHash: '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', // admin123
-      updatedAt: new Date().toISOString()
-    };
-    storageService.saveAdminAccount(defaultAcc);
-    setAdminAccount(defaultAcc);
-    setUsernameInput('admin');
-    setPasswordInput('admin123');
-    setAuthError('');
-    alert('Admin account reset! Credentials are now: Username: admin | Password: admin123');
   };
 
   const handleDownloadPublicationFile = async (pub: Publication) => {
@@ -545,7 +463,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       if (folderFilter !== 'all' && p.type !== folderFilter) {
         return false;
       }
-    } else if (activeTab !== 'all' && activeTab !== 'settings' && activeTab !== 'database' && activeTab !== 'newsletter' && p.status !== activeTab) {
+    } else if (activeTab !== 'all' && activeTab !== 'settings' && activeTab !== 'newsletter' && p.status !== activeTab) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -661,14 +579,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 {/* Username */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-bold text-[#3E1028] uppercase tracking-wider">
-                    Admin Username
+                    Username
                   </label>
                   <div className="relative">
                     <UserCheck className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
                       type="text"
                       required
-                      placeholder="Enter admin username (e.g. admin)"
+                      placeholder="Enter username"
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30 focus:border-[#D95F7F]"
@@ -686,7 +604,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
-                      placeholder="Enter admin password"
+                      placeholder="Enter password"
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
                       className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30 focus:border-[#D95F7F]"
@@ -694,7 +612,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700"
+                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-[#D95F7F]" />}
                     </button>
@@ -711,34 +629,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#D95F7F]/25 transition-all hover:scale-101"
+                  className="w-full py-3 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-[#D95F7F]/25 transition-all hover:scale-101 cursor-pointer"
                 >
-                  Log In to Dashboard
+                  Sign In
                 </button>
 
-                {/* Quick Fill & Recovery Tools */}
-                <div className="pt-2 flex flex-col gap-2 border-t border-[#F4E5DA]/60">
-                  <button
-                    type="button"
-                    onClick={handleQuickFillAdmin}
-                    className="w-full py-2 rounded-full bg-[#FAF2EB] hover:bg-[#F4E5DA] text-[#3E1028] text-xs font-semibold border border-[#F4E5DA] transition-colors"
-                  >
-                    ⚡ Auto-Fill Default Credentials (admin / admin123)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleEmergencyResetCredentials}
-                    className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors text-center"
-                  >
-                    Forgot or locked out? Reset password to default
-                  </button>
-                </div>
-
                 {/* Secure Auth Indicator */}
-                <div className="pt-1 text-center text-[11px] text-[#5C1D3B]/60 flex items-center justify-center gap-1.5">
+                <div className="pt-2 text-center text-[11px] text-[#5C1D3B]/60 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Secured with SHA-256 Cryptographic Hash Validation</span>
+                  <span>Encrypted Cryptographic Authentication</span>
                 </div>
 
               </form>
@@ -838,17 +737,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <span>Newsletter & Broadcast ({subscribers.length})</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('database')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === 'database'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-white text-amber-900 hover:bg-amber-50 border border-amber-300'
-                  }`}
-                >
-                  <Database className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Firebase Cloud ({publications.length})</span>
-                </button>
-                <button
                   onClick={() => setActiveTab('settings')}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
                     activeTab === 'settings'
@@ -862,7 +750,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </div>
 
               {/* Search (only for publications & files view) */}
-              {activeTab !== 'settings' && activeTab !== 'newsletter' && activeTab !== 'database' && (
+              {activeTab !== 'settings' && activeTab !== 'newsletter' && (
                 <div className="relative w-full sm:w-64">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                   <input
@@ -1020,7 +908,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </form>
                 </div>
 
-                {/* Cloud Admin Team Management Card */}
+                {/* Admin Team Management Card */}
                 <div className="max-w-2xl w-full bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
                   <div className="flex items-center justify-between border-b border-[#F4E5DA] pb-4">
                     <div className="flex items-center gap-3">
@@ -1030,14 +918,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-serif text-lg font-bold text-[#3E1028]">
-                            Cloud Admin Accounts
+                            Authorized Administrator Accounts
                           </h3>
                           <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold">
-                            Firebase <code className="font-mono">admins</code> Collection
+                            Live Multi-Admin Access
                           </span>
                         </div>
                         <p className="text-xs text-[#5C1D3B]/70">
-                          Create and manage authorized administrators. All accounts sync live to Firebase Firestore.
+                          Create and manage authorized administrators. All accounts sync securely in real-time across devices.
                         </p>
                       </div>
                     </div>
@@ -1165,7 +1053,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             Cloud Document & File Repository
                           </h3>
                           <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
-                            Firebase Cloud Storage
+                            Live Storage
                           </span>
                         </div>
                         <p className="text-xs text-[#5C1D3B]/70">
@@ -1349,261 +1237,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   )}
                 </div>
 
-              </div>
-            ) : activeTab === 'database' ? (
-              /* Tab View: Production Firebase Cloud Firestore Hub */
-              <div className="flex-grow overflow-y-auto p-4 sm:p-6 flex justify-center items-start">
-                <div className="max-w-4xl w-full space-y-6">
-                  
-                  {/* Production Cloud Status Card */}
-                  <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md">
-                          <Cloud className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-serif text-lg font-bold text-[#3E1028]">
-                              Google Firebase Live Cloud
-                            </h3>
-                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                              tsl-sri-shakthi
-                            </span>
-                          </div>
-                          <p className="text-xs text-[#5C1D3B]/70">
-                            Real-time multi-device cloud synchronization. All publications, files, and admins are connected globally.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={handleTestCloudConnection}
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-amber-950 bg-amber-100 hover:bg-amber-200 transition-all border border-amber-300 cursor-pointer"
-                        >
-                          <Server className="w-3.5 h-3.5 text-amber-800" />
-                          <span>Test Connection</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleForceCloudSync}
-                          disabled={isSyncingCloud}
-                          className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                          <span>{isSyncingCloud ? 'Syncing...' : 'Sync Cloud Now'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sync Notice Banner */}
-                    {syncNotice && (
-                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>{syncNotice}</span>
-                      </div>
-                    )}
-
-                    {/* Test Status Banner */}
-                    {dbTestResult.status === 'testing' && (
-                      <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
-                        <span>{dbTestResult.message}</span>
-                      </div>
-                    )}
-
-                    {dbTestResult.status === 'success' && (
-                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>{dbTestResult.message}</span>
-                      </div>
-                    )}
-
-                    {dbTestResult.status === 'error' && (
-                      <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                        <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                        <span>{dbTestResult.message}</span>
-                      </div>
-                    )}
-
-                    {/* Cloud Overview Badges */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Cloud Publications</div>
-                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-blue-600" />
-                          <span>{publications.length} Live Documents</span>
-                        </div>
-                        <div className="text-[10px] text-emerald-700 font-medium">Synced in Real-time</div>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Cloud Subscribers</div>
-                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
-                          <Users className="w-4 h-4 text-[#D95F7F]" />
-                          <span>{subscribers.length} Emails</span>
-                        </div>
-                        <div className="text-[10px] text-slate-600">Newsletter ready</div>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Authorized Admins</div>
-                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-purple-600" />
-                          <span>{allAdmins.length} Cloud Admins</span>
-                        </div>
-                        <div className="text-[10px] text-slate-600">Global access enabled</div>
-                      </div>
-                    </div>
-
-                    {/* Firebase Cloud Credentials Form */}
-                    <div className="border border-[#F4E5DA] rounded-2xl overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setShowAdvancedDbSettings(!showAdvancedDbSettings)}
-                        className="w-full flex items-center justify-between p-4 bg-[#FAF2EB]/50 hover:bg-[#FAF2EB] transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Settings className="w-4 h-4 text-slate-600" />
-                          <span className="text-xs font-bold text-[#3E1028]">
-                            Firebase Project Configuration & API Keys
-                          </span>
-                        </div>
-                        {showAdvancedDbSettings ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
-                      </button>
-
-                      {showAdvancedDbSettings && (
-                        <form onSubmit={handleSaveDbSettings} className="p-4 sm:p-6 bg-white space-y-4 text-xs border-t border-[#F4E5DA]">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* API Key */}
-                            <div className="space-y-1">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Firebase API Key
-                              </label>
-                              <div className="relative">
-                                <input
-                                  type={showFbApiKey ? 'text' : 'password'}
-                                  required
-                                  value={fbApiKey}
-                                  onChange={(e) => setFbApiKey(e.target.value)}
-                                  placeholder="AIzaSy..."
-                                  className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowFbApiKey(!showFbApiKey)}
-                                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
-                                >
-                                  {showFbApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-amber-600" />}
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Project ID */}
-                            <div className="space-y-1">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Firebase Project ID
-                              </label>
-                              <input
-                                type="text"
-                                required
-                                value={fbProjectId}
-                                onChange={(e) => setFbProjectId(e.target.value)}
-                                placeholder="sthree-shakthi-12345"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                              />
-                            </div>
-
-                            {/* App ID */}
-                            <div className="space-y-1">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Firebase App ID
-                              </label>
-                              <input
-                                type="text"
-                                required
-                                value={fbAppId}
-                                onChange={(e) => setFbAppId(e.target.value)}
-                                placeholder="1:1234567890:web:abcdef12345"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                              />
-                            </div>
-
-                            {/* Auth Domain */}
-                            <div className="space-y-1">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Auth Domain
-                              </label>
-                              <input
-                                type="text"
-                                value={fbAuthDomain}
-                                onChange={(e) => setFbAuthDomain(e.target.value)}
-                                placeholder="sthree-shakthi-12345.firebaseapp.com"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                              />
-                            </div>
-
-                            {/* Storage Bucket */}
-                            <div className="space-y-1">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Storage Bucket (Optional)
-                              </label>
-                              <input
-                                type="text"
-                                value={fbStorageBucket}
-                                onChange={(e) => setFbStorageBucket(e.target.value)}
-                                placeholder="sthree-shakthi-12345.firebasestorage.app"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                              />
-                            </div>
-
-                            {/* Messaging Sender ID */}
-                            <div className="space-y-1">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Messaging Sender ID (Optional)
-                              </label>
-                              <input
-                                type="text"
-                                value={fbMessagingSenderId}
-                                onChange={(e) => setFbMessagingSenderId(e.target.value)}
-                                placeholder="123456789012"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Firestore Rules Helper */}
-                          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 space-y-1.5">
-                            <div className="font-bold flex items-center gap-1.5">
-                              <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
-                              <span>Firestore Security Rules (Test / Production)</span>
-                            </div>
-                            <p className="text-amber-800">
-                              In Firebase Console &gt; Firestore Database &gt; Rules, set rules to allow reading and writing:
-                            </p>
-                            <pre className="p-2 rounded bg-black/80 text-amber-200 font-mono text-[10px] overflow-x-auto">
-                              {`rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`}
-                            </pre>
-                          </div>
-
-                          <div className="pt-2">
-                            <button
-                              type="submit"
-                              className="w-full py-2.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-1.5"
-                            >
-                              <Save className="w-4 h-4" />
-                              <span>Save & Apply Firebase Settings</span>
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
               </div>
             ) : activeTab === 'newsletter' ? (
               /* Tab View 2: Newsletter & Broadcast Suite */
