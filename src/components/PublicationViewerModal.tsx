@@ -24,12 +24,14 @@ interface PublicationViewerModalProps {
   publication: Publication | null;
   onClose: () => void;
   onLike: (id: string, e: React.MouseEvent) => void;
+  isAdminView?: boolean;
 }
 
 export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   publication,
   onClose,
   onLike,
+  isAdminView = false,
 }) => {
   const [copiedToast, setCopiedToast] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
@@ -233,20 +235,22 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               <span className="hidden md:inline">{copiedToast ? 'Copied' : 'Share'}</span>
             </button>
 
-            {/* Heart Like Button */}
-            <button
-              type="button"
-              onClick={handleHeartClick}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-xs font-bold transition-all shadow-2xs border hover:scale-105 active:scale-95 ${
-                hasLiked || likesCount > 0
-                  ? 'bg-rose-50 text-[#D95F7F] border-[#D95F7F]/40'
-                  : 'bg-white text-[#D95F7F] hover:bg-rose-50 border-[#F4E5DA]'
-              }`}
-              title="Like this publication"
-            >
-              <Heart className={`w-3.5 h-3.5 transition-transform ${hasLiked ? 'scale-125 fill-[#D95F7F] text-[#D95F7F]' : likesCount > 0 ? 'fill-[#D95F7F] text-[#D95F7F]' : ''}`} />
-              <span className="text-xs">{likesCount}</span>
-            </button>
+            {/* Heart Like Button (Only in Public View) */}
+            {!isAdminView && (
+              <button
+                type="button"
+                onClick={handleHeartClick}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full text-xs font-bold transition-all shadow-2xs border hover:scale-105 active:scale-95 ${
+                  hasLiked || likesCount > 0
+                    ? 'bg-rose-50 text-[#D95F7F] border-[#D95F7F]/40'
+                    : 'bg-white text-[#D95F7F] hover:bg-rose-50 border-[#F4E5DA]'
+                }`}
+                title="Like this publication"
+              >
+                <Heart className={`w-3.5 h-3.5 transition-transform ${hasLiked ? 'scale-125 fill-[#D95F7F] text-[#D95F7F]' : likesCount > 0 ? 'fill-[#D95F7F] text-[#D95F7F]' : ''}`} />
+                <span className="text-xs">{likesCount}</span>
+              </button>
+            )}
 
             {/* Fullscreen Toggle */}
             <button

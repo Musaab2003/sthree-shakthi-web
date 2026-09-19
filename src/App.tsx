@@ -210,6 +210,7 @@ export function App() {
         publication={viewingPublication}
         onClose={() => setViewingPublication(null)}
         onLike={handleLike}
+        isAdminView={isAdminPortalOpen}
       />
 
       {/* Submit Publication Modal */}
