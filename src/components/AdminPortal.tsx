@@ -46,9 +46,9 @@ import {
   ChevronUp,
   FileCheck
 } from 'lucide-react';
-import { Publication, PublicationStatus, AdminAccount, DatabaseConfig } from '../types';
+import { Publication, PublicationStatus, AdminAccount, DatabaseConfig, FirebaseConfig } from '../types';
 import { storageService } from '../services/storageService';
-import { tursoService } from '../services/tursoService';
+import { firebaseService } from '../services/firebaseService';
 import { hashPassword, verifyPassword, generateStrongPassword } from '../utils/crypto';
 
 interface AdminPortalProps {
@@ -90,11 +90,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState<boolean>(true);
 
-  // Turso Cloud Database State
-  const [dbConfig, setDbConfig] = useState<DatabaseConfig>(storageService.getDatabaseConfig());
-  const [dbUrlInput, setDbUrlInput] = useState(dbConfig.databaseUrl);
-  const [dbTokenInput, setDbTokenInput] = useState(dbConfig.authToken);
-  const [showDbToken, setShowDbToken] = useState(false);
+  // Firebase Cloud Database State
+  const [fbConfig, setFbConfig] = useState<FirebaseConfig>(() => firebaseService.getConfig());
+  const [fbApiKey, setFbApiKey] = useState(fbConfig.apiKey || '');
+  const [fbAuthDomain, setFbAuthDomain] = useState(fbConfig.authDomain || '');
+  const [fbProjectId, setFbProjectId] = useState(fbConfig.projectId || '');
+  const [fbStorageBucket, setFbStorageBucket] = useState(fbConfig.storageBucket || '');
+  const [fbMessagingSenderId, setFbMessagingSenderId] = useState(fbConfig.messagingSenderId || '');
+  const [fbAppId, setFbAppId] = useState(fbConfig.appId || '');
+  const [showFbApiKey, setShowFbApiKey] = useState(false);
   const [showAdvancedDbSettings, setShowAdvancedDbSettings] = useState(false);
   const [dbTestResult, setDbTestResult] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message: string }>({ status: 'idle', message: '' });
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
@@ -107,7 +111,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [liveHashPreview, setLiveHashPreview] = useState('');
   const [copiedGenerated, setCopiedGenerated] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
 
@@ -128,10 +131,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     const acc = storageService.getAdminAccount();
     setAdminAccount(acc);
     setEditUsername(acc.username);
-    const cfg = storageService.getDatabaseConfig();
-    setDbConfig(cfg);
-    setDbUrlInput(cfg.databaseUrl);
-    setDbTokenInput(cfg.authToken);
+    const cfg = firebaseService.getConfig();
+    setFbConfig(cfg);
+    setFbApiKey(cfg.apiKey || '');
+    setFbProjectId(cfg.projectId || '');
+    setFbAppId(cfg.appId || '');
+    setFbAuthDomain(cfg.authDomain || '');
+    setFbStorageBucket(cfg.storageBucket || '');
+    setFbMessagingSenderId(cfg.messagingSenderId || '');
     setSubscribers(storageService.getSubscribers());
     setBroadcastHistory(storageService.getBroadcastHistory());
   }, [isOpen]);
@@ -158,15 +165,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       navigator.clipboard.writeText(newPassword);
       setCopiedGenerated(true);
       setTimeout(() => setCopiedGenerated(false), 2000);
-    }
-  };
-
-  const handleCopyTursoSql = () => {
-    if (liveHashPreview) {
-      const sql = `UPDATE admin_users SET password_hash = '${liveHashPreview}', updated_at = CURRENT_TIMESTAMP WHERE username = '${editUsername.trim() || 'admin'}';`;
-      navigator.clipboard.writeText(sql);
-      setCopiedSql(true);
-      setTimeout(() => setCopiedSql(false), 2000);
     }
   };
 
@@ -263,52 +261,54 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   };
 
   const handleTestCloudConnection = async () => {
-    setDbTestResult({ status: 'testing', message: 'Testing connection to Turso Cloud...' });
-    storageService.saveDatabaseConfig({
-      type: 'turso',
-      databaseUrl: dbUrlInput.trim(),
-      authToken: dbTokenInput.trim(),
-      connected: true
-    });
-    const res = await tursoService.executeQuery('SELECT count(*) as count FROM publications;');
-    if (res.error) {
+    setDbTestResult({ status: 'testing', message: 'Testing real-time connection to Firebase Cloud Firestore...' });
+    const cfg: FirebaseConfig = {
+      apiKey: fbApiKey.trim(),
+      authDomain: fbAuthDomain.trim(),
+      projectId: fbProjectId.trim(),
+      storageBucket: fbStorageBucket.trim(),
+      messagingSenderId: fbMessagingSenderId.trim(),
+      appId: fbAppId.trim(),
+    };
+    firebaseService.saveConfig(cfg);
+    const res = await firebaseService.testConnection();
+    if (res.success) {
       setDbTestResult({ 
-        status: 'error', 
-        message: res.error.includes('Unauthorized') 
-          ? 'Error: Unauthorized. Please generate and paste your Turso Auth Token below.' 
-          : `Connection error: ${res.error}` 
+        status: 'success', 
+        message: res.message
       });
     } else {
       setDbTestResult({ 
-        status: 'success', 
-        message: '🟢 Successfully connected to Turso Cloud (sthree-shakthi-db)! Live Multi-Device Sync is active.' 
+        status: 'error', 
+        message: res.message
       });
     }
   };
 
   const handleSaveDbSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated: DatabaseConfig = {
-      type: 'turso',
-      databaseUrl: dbUrlInput.trim(),
-      authToken: dbTokenInput.trim(),
-      connected: !!(dbUrlInput.trim() && dbTokenInput.trim()),
-      lastSyncedAt: new Date().toISOString()
+    const cfg: FirebaseConfig = {
+      apiKey: fbApiKey.trim(),
+      authDomain: fbAuthDomain.trim(),
+      projectId: fbProjectId.trim(),
+      storageBucket: fbStorageBucket.trim(),
+      messagingSenderId: fbMessagingSenderId.trim(),
+      appId: fbAppId.trim(),
     };
-    storageService.saveDatabaseConfig(updated);
-    setDbConfig(updated);
-    setSyncNotice('Turso database configuration saved successfully!');
+    firebaseService.saveConfig(cfg);
+    setFbConfig(cfg);
+    setSyncNotice('Firebase configuration saved successfully!');
     setTimeout(() => setSyncNotice(''), 3000);
     handleTestCloudConnection();
   };
 
   const handleForceCloudSync = async () => {
     setIsSyncingCloud(true);
-    setSyncNotice('Connecting to Turso Cloud & syncing all submissions across laptops...');
+    setSyncNotice('Connecting to Firebase Cloud Firestore & syncing submissions across devices...');
     const result = await storageService.syncFromCloud();
     setSubscribers(result.subscribers);
     setIsSyncingCloud(false);
-    setSyncNotice(`✅ Synced successfully! ${result.publications.length} publication(s) and ${result.subscribers.length} subscriber(s) loaded.`);
+    setSyncNotice(`✅ Synced with Firebase Cloud! ${result.publications.length} publication(s) and ${result.subscribers.length} subscriber(s) loaded.`);
     setTimeout(() => setSyncNotice(''), 4000);
   };
 
@@ -846,16 +846,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           <button
                             type="button"
                             onClick={handleCopyPassword}
-                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[#F8CAD5] text-[11px] font-bold transition-colors"
-                          >
-                            {copiedGenerated ? 'Copied Password!' : 'Copy Password'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCopyTursoSql}
                             className="px-2.5 py-1 rounded-lg bg-[#D95F7F] hover:bg-[#BE4465] text-white text-[11px] font-bold transition-colors"
                           >
-                            {copiedSql ? 'Copied SQL!' : 'Copy Turso SQL'}
+                            {copiedGenerated ? 'Copied Password!' : 'Copy Password'}
                           </button>
                         </div>
                       </div>
@@ -958,7 +951,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                             Cloud Document & File Repository
                           </h3>
                           <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
-                            Turso Stored Files
+                            Firebase Cloud Storage
                           </span>
                         </div>
                         <p className="text-xs text-[#5C1D3B]/70">
@@ -1144,7 +1137,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
               </div>
             ) : activeTab === 'database' ? (
-              /* Tab View: Production Turso Cloud Hub */
+              /* Tab View: Production Firebase Cloud Firestore Hub */
               <div className="flex-grow overflow-y-auto p-4 sm:p-6 flex justify-center items-start">
                 <div className="max-w-4xl w-full space-y-6">
                   
@@ -1152,34 +1145,45 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0 border border-emerald-200 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0 border border-amber-200 shadow-2xs">
                           <Cloud className="w-6 h-6" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-serif text-lg font-bold text-[#3E1028]">
-                              Production Cloud Database & Storage Hub
+                              Google Firebase Cloud Firestore Hub
                             </h3>
                             <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                              Active Cluster
+                              {firebaseService.isConfigured() ? 'Firebase Active' : 'Firebase Ready'}
                             </span>
                           </div>
                           <p className="text-xs text-[#5C1D3B]/70">
-                            Enterprise LibSQL distributed database powered by Turso (AWS ap-south-1).
+                            Realtime WebSocket & Cloud Firestore distributed database with instant multi-device synchronization.
                           </p>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={handleForceCloudSync}
-                        disabled={isSyncingCloud}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                        <span>{isSyncingCloud ? 'Syncing...' : 'Force Cloud Sync Now'}</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href="https://console.firebase.google.com"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 transition-all border border-amber-300"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Firebase Console</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={handleForceCloudSync}
+                          disabled={isSyncingCloud}
+                          className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                          <span>{isSyncingCloud ? 'Syncing...' : 'Sync Firestore Now'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Sync Notice Banner */}
@@ -1217,48 +1221,48 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
                         <div className="text-[10px] font-black uppercase text-slate-500">Database Engine</div>
                         <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
-                          <HardDrive className="w-4 h-4 text-emerald-700" />
-                          <span>Turso LibSQL v2</span>
+                          <HardDrive className="w-4 h-4 text-amber-600" />
+                          <span>Firebase Firestore</span>
                         </div>
-                        <div className="text-[10px] text-emerald-700 font-medium">AWS South Asia (Mumbai)</div>
+                        <div className="text-[10px] text-emerald-700 font-medium">Real-time WebSocket Listeners</div>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Cloud Publications</div>
+                        <div className="text-[10px] font-black uppercase text-slate-500">Live Publications</div>
                         <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
                           <Layers className="w-4 h-4 text-blue-600" />
-                          <span>{publications.length} Records</span>
+                          <span>{publications.length} Documents</span>
                         </div>
-                        <div className="text-[10px] text-slate-600">Syncs every 20 seconds</div>
+                        <div className="text-[10px] text-slate-600">Instant Multi-Device Sync</div>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Subscribers Cloud Table</div>
+                        <div className="text-[10px] font-black uppercase text-slate-500">Subscribers Collection</div>
                         <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
                           <Users className="w-4 h-4 text-[#D95F7F]" />
                           <span>{subscribers.length} Subscribers</span>
                         </div>
-                        <div className="text-[10px] text-slate-600">Auto-broadcast ready</div>
+                        <div className="text-[10px] text-slate-600">Cloud broadcast ready</div>
                       </div>
                     </div>
 
                     {/* Quick Test Connection Button */}
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA]">
                       <div>
-                        <div className="text-xs font-bold text-[#3E1028]">Live Connection Diagnostic</div>
-                        <div className="text-[11px] text-slate-500">Ping Turso server to verify zero-latency multi-device submissions</div>
+                        <div className="text-xs font-bold text-[#3E1028]">Live Firestore Connection Diagnostic</div>
+                        <div className="text-[11px] text-slate-500">Ping Firebase servers to verify real-time read and write access</div>
                       </div>
                       <button
                         type="button"
                         onClick={handleTestCloudConnection}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs"
                       >
                         <Server className="w-3.5 h-3.5" />
-                        <span>Run Ping Test</span>
+                        <span>Test Firebase Connection</span>
                       </button>
                     </div>
 
-                    {/* Advanced Cloud Credentials (Collapsible) */}
+                    {/* Firebase Cloud Credentials Form */}
                     <div className="border border-[#F4E5DA] rounded-2xl overflow-hidden">
                       <button
                         type="button"
@@ -1268,7 +1272,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         <div className="flex items-center gap-2">
                           <Settings className="w-4 h-4 text-slate-600" />
                           <span className="text-xs font-bold text-[#3E1028]">
-                            Advanced Connection Credentials (Environment Settings)
+                            Firebase Project Configuration & API Keys
                           </span>
                         </div>
                         {showAdvancedDbSettings ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
@@ -1276,62 +1280,125 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                       {showAdvancedDbSettings && (
                         <form onSubmit={handleSaveDbSettings} className="p-4 sm:p-6 bg-white space-y-4 text-xs border-t border-[#F4E5DA]">
-                          {/* Database URL */}
-                          <div className="space-y-1">
-                            <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                              Turso Database URL
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={dbUrlInput}
-                              onChange={(e) => setDbUrlInput(e.target.value)}
-                              placeholder="libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* API Key */}
+                            <div className="space-y-1">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Firebase API Key
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type={showFbApiKey ? 'text' : 'password'}
+                                  required
+                                  value={fbApiKey}
+                                  onChange={(e) => setFbApiKey(e.target.value)}
+                                  placeholder="AIzaSy..."
+                                  className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowFbApiKey(!showFbApiKey)}
+                                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
+                                >
+                                  {showFbApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-amber-600" />}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Project ID */}
+                            <div className="space-y-1">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Firebase Project ID
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={fbProjectId}
+                                onChange={(e) => setFbProjectId(e.target.value)}
+                                placeholder="sthree-shakthi-12345"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                              />
+                            </div>
+
+                            {/* App ID */}
+                            <div className="space-y-1">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Firebase App ID
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={fbAppId}
+                                onChange={(e) => setFbAppId(e.target.value)}
+                                placeholder="1:1234567890:web:abcdef12345"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                              />
+                            </div>
+
+                            {/* Auth Domain */}
+                            <div className="space-y-1">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Auth Domain
+                              </label>
+                              <input
+                                type="text"
+                                value={fbAuthDomain}
+                                onChange={(e) => setFbAuthDomain(e.target.value)}
+                                placeholder="sthree-shakthi-12345.firebaseapp.com"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                              />
+                            </div>
+
+                            {/* Storage Bucket */}
+                            <div className="space-y-1">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Storage Bucket (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={fbStorageBucket}
+                                onChange={(e) => setFbStorageBucket(e.target.value)}
+                                placeholder="sthree-shakthi-12345.firebasestorage.app"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                              />
+                            </div>
+
+                            {/* Messaging Sender ID */}
+                            <div className="space-y-1">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Messaging Sender ID (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={fbMessagingSenderId}
+                                onChange={(e) => setFbMessagingSenderId(e.target.value)}
+                                placeholder="123456789012"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                              />
+                            </div>
                           </div>
 
-                          {/* Auth Token */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                                Turso Cloud Auth Token (JWT)
-                              </label>
-                              <a
-                                href="https://turso.tech/app"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[11px] text-emerald-700 font-bold hover:underline inline-flex items-center gap-1"
-                              >
-                                <span>Open Turso Dashboard</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                          {/* Firestore Rules Helper */}
+                          <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 space-y-1.5">
+                            <div className="font-bold flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Firestore Security Rules (Test / Production)</span>
                             </div>
-                            <div className="relative">
-                              <input
-                                type={showDbToken ? 'text' : 'password'}
-                                value={dbTokenInput}
-                                onChange={(e) => setDbTokenInput(e.target.value)}
-                                placeholder="Paste Turso Auth Token"
-                                className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowDbToken(!showDbToken)}
-                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
-                              >
-                                {showDbToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-emerald-700" />}
-                              </button>
-                            </div>
+                            <p className="text-amber-800">
+                              In Firebase Console &gt; Firestore Database &gt; Rules, set rules to allow reading and writing:
+                            </p>
+                            <pre className="p-2 rounded bg-black/80 text-amber-200 font-mono text-[10px] overflow-x-auto">
+                              {`rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`}
+                            </pre>
                           </div>
 
                           <div className="pt-2">
                             <button
                               type="submit"
-                              className="w-full py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-1.5"
+                              className="w-full py-2.5 rounded-full bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-1.5"
                             >
                               <Save className="w-4 h-4" />
-                              <span>Save & Activate Configuration</span>
+                              <span>Save & Apply Firebase Settings</span>
                             </button>
                           </div>
                         </form>

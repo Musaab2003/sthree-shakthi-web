@@ -1,6 +1,6 @@
 import { Publication, PublicationStatus, DatabaseConfig, AdminAccount } from '../types';
 import { INITIAL_PUBLICATIONS } from '../data/initialPublications';
-import { tursoService } from './tursoService';
+import { firebaseService, DEFAULT_FIREBASE_CONFIG } from './firebaseService';
 
 const STORAGE_KEY = 'sthree_shakthi_publications_v3';
 const DB_CONFIG_KEY = 'sthree_shakthi_db_config_v2';
@@ -19,9 +19,8 @@ const DEFAULT_ADMIN: AdminAccount = {
 };
 
 const DEFAULT_DB_CONFIG: DatabaseConfig = {
-  type: 'turso',
-  databaseUrl: 'libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io',
-  authToken: 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODk3OTYxNTQsImlkIjoiMDFhMDdmMmEtM2EwMS03NmY0LWI2ZGUtYzE5YzU3OTY1ZDQ0Iiwia2lkIjoiY1JfdV81RVNLVXJFWTZWejNXMXFXbk5MVGNKeHU2cWZnajlXaFVJOU9MWSIsInJpZCI6ImY5YzUyZGI3LTBhNTItNDhhZC04YWU1LTg5MWZmOWVmYjdlNyJ9.lvfBa8bP0CZHqvzFW1Y1Ush4P5d7iopZKTFarkKjye56R5i7CDbFtqyspyZECyxUSqccoveHtdGbOEANOuZuCw',
+  type: 'firebase',
+  firebaseConfig: DEFAULT_FIREBASE_CONFIG,
   connected: true,
   lastSyncedAt: new Date().toISOString()
 };
@@ -126,7 +125,7 @@ export const storageService = {
     return all.filter(p => p.status === 'pending');
   },
 
-  // 4. Submit a new publication (works across all laptops via Turso Cloud sync)
+  // 4. Submit a new publication (works across all devices via Firebase Cloud sync)
   async submitPublication(pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>): Promise<{ success: boolean; publication: Publication }> {
     const pubId = `pub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     
@@ -150,16 +149,16 @@ export const storageService = {
     all.unshift(newPub);
     safeSavePublications(all);
 
-    // Sync to Turso Cloud directly and await result
+    // Sync to Firebase Cloud directly and await result
     try {
-      const inserted = await tursoService.insertPublication(newPub);
+      const inserted = await firebaseService.insertPublication(newPub);
       if (!inserted && newPub.fileData) {
         // Fallback: If heavy payload hit network limits, insert metadata and preview
         const lightweightPub = { ...newPub, fileData: undefined };
-        await tursoService.insertPublication(lightweightPub);
+        await firebaseService.insertPublication(lightweightPub);
       }
     } catch (err) {
-      console.warn('Turso Cloud publish error:', err);
+      console.warn('Firebase Cloud publish error:', err);
     }
 
     return { success: true, publication: newPub };
@@ -175,8 +174,8 @@ export const storageService = {
       fileDataMemoryCache.set(id, fromIdb);
       return fromIdb;
     }
-    // Fetch from Turso Cloud on demand
-    const fromCloud = await tursoService.getPublicationFileData(id);
+    // Fetch from Firebase Cloud on demand
+    const fromCloud = await firebaseService.getPublicationFileData(id);
     if (fromCloud) {
       fileDataMemoryCache.set(id, fromCloud);
       saveFileToIDB(id, fromCloud);
@@ -193,7 +192,7 @@ export const storageService = {
       all[index].status = 'approved';
       all[index].approvedAt = new Date().toISOString();
       safeSavePublications(all);
-      tursoService.updatePublicationStatus(id, 'approved').catch(() => {});
+      firebaseService.updatePublicationStatus(id, 'approved').catch(() => {});
       return true;
     }
     return false;
@@ -207,7 +206,7 @@ export const storageService = {
       all[index].status = 'rejected';
       all[index].rejectedReason = reason || 'Does not match editorial criteria.';
       safeSavePublications(all);
-      tursoService.updatePublicationStatus(id, 'rejected', reason).catch(() => {});
+      firebaseService.updatePublicationStatus(id, 'rejected', reason).catch(() => {});
       return true;
     }
     return false;
@@ -220,7 +219,7 @@ export const storageService = {
     if (index !== -1) {
       all[index].isFeatured = !all[index].isFeatured;
       safeSavePublications(all);
-      tursoService.togglePublicationFeature(id, all[index].isFeatured || false).catch(() => {});
+      firebaseService.togglePublicationFeature(id, all[index].isFeatured || false).catch(() => {});
       return true;
     }
     return false;
@@ -233,7 +232,7 @@ export const storageService = {
     all = all.filter(p => p.id !== id);
     if (all.length !== initialLen) {
       safeSavePublications(all);
-      tursoService.deletePublication(id).catch(() => {});
+      firebaseService.deletePublication(id).catch(() => {});
       return true;
     }
     return false;
@@ -246,7 +245,7 @@ export const storageService = {
     if (index !== -1) {
       all[index] = updatedPub;
       safeSavePublications(all);
-      tursoService.insertPublication(updatedPub).catch(() => {});
+      firebaseService.insertPublication(updatedPub).catch(() => {});
       return true;
     }
     return false;
@@ -318,7 +317,7 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
   },
 
-  // 14. Newsletter Subscriptions & Broadcast Engine (Syncs with Turso Cloud)
+  // 14. Newsletter Subscriptions & Broadcast Engine (Syncs with Firebase Cloud)
   subscribeEmail(email: string): boolean {
     try {
       const subs: string[] = JSON.parse(localStorage.getItem(SUBSCRIBERS_KEY) || '[]');
@@ -327,7 +326,7 @@ export const storageService = {
         subs.push(clean);
         localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(subs));
       }
-      tursoService.insertSubscriber(clean).catch(() => {});
+      firebaseService.insertSubscriber(clean).catch(() => {});
       return true;
     } catch {
       return false;
@@ -349,7 +348,7 @@ export const storageService = {
       subs = subs.filter(s => s.toLowerCase() !== email.trim().toLowerCase());
       if (subs.length !== initial) {
         localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(subs));
-        tursoService.removeSubscriber(email).catch(() => {});
+        firebaseService.removeSubscriber(email).catch(() => {});
         return true;
       }
       return false;
@@ -380,33 +379,24 @@ export const storageService = {
     } catch (e) {}
   },
 
-  // 15. Database Configuration (Turso)
+  // 15. Database Configuration (Firebase)
   getDatabaseConfig(): DatabaseConfig {
     try {
-      const data = localStorage.getItem(DB_CONFIG_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        let modified = false;
-        if (!parsed.authToken) {
-          parsed.authToken = DEFAULT_DB_CONFIG.authToken;
-          modified = true;
-        }
-        if (!parsed.databaseUrl) {
-          parsed.databaseUrl = DEFAULT_DB_CONFIG.databaseUrl;
-          modified = true;
-        }
-        if (modified) {
-          localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(parsed));
-        }
-        return parsed;
-      }
-      localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(DEFAULT_DB_CONFIG));
-      return DEFAULT_DB_CONFIG;
+      const fbConfig = firebaseService.getConfig();
+      return {
+        type: 'firebase',
+        firebaseConfig: fbConfig,
+        connected: firebaseService.isConfigured(),
+        lastSyncedAt: new Date().toISOString()
+      };
     } catch (e) {}
     return DEFAULT_DB_CONFIG;
   },
 
   saveDatabaseConfig(config: DatabaseConfig): void {
+    if (config.firebaseConfig) {
+      firebaseService.saveConfig(config.firebaseConfig);
+    }
     localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(config));
   },
 
@@ -429,8 +419,8 @@ export const storageService = {
   // 17. Multi-Device Cloud Synchronizer
   async syncFromCloud(): Promise<{ publications: Publication[]; subscribers: string[] }> {
     try {
-      // 1. Sync remote publications from Turso Cloud
-      const remotePubs = await tursoService.syncAllPublications();
+      // 1. Sync remote publications from Firebase Cloud Firestore
+      const remotePubs = await firebaseService.syncAllPublications();
       let currentPubs = this.getAllPublications();
       
       if (remotePubs !== null && Array.isArray(remotePubs)) {
@@ -451,8 +441,8 @@ export const storageService = {
         safeSavePublications(currentPubs);
       }
 
-      // 2. Sync remote subscribers from Turso Cloud
-      const remoteSubs = await tursoService.syncSubscribers();
+      // 2. Sync remote subscribers from Firebase Cloud Firestore
+      const remoteSubs = await firebaseService.syncSubscribers();
       let currentSubs = this.getSubscribers();
       if (remoteSubs !== null && Array.isArray(remoteSubs)) {
         currentSubs = remoteSubs;

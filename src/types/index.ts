@@ -52,10 +52,19 @@ export interface ClubContact {
   logoBadge?: string;
 }
 
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId: string;
+  measurementId?: string;
+}
+
 export interface DatabaseConfig {
-  type: 'turso' | 'local';
-  databaseUrl: string;
-  authToken: string;
+  type: 'firebase' | 'local';
+  firebaseConfig?: FirebaseConfig;
   connected: boolean;
   lastSyncedAt?: string;
 }

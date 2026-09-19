@@ -12,6 +12,7 @@ import { DatabaseSettingsModal } from './components/DatabaseSettingsModal';
 
 import { Publication, DatabaseConfig } from './types';
 import { storageService } from './services/storageService';
+import { firebaseService } from './services/firebaseService';
 
 export function App() {
   const [allPublications, setAllPublications] = useState<Publication[]>([]);
@@ -24,12 +25,7 @@ export function App() {
   const [viewingPublication, setViewingPublication] = useState<Publication | null>(null);
   
   // DB Config
-  const [dbConfig, setDbConfig] = useState<DatabaseConfig>({
-    type: 'turso',
-    databaseUrl: 'libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io',
-    authToken: '',
-    connected: true
-  });
+  const [dbConfig, setDbConfig] = useState<DatabaseConfig>(() => storageService.getDatabaseConfig());
 
   // Load data & attach hidden admin triggers on initial render
   useEffect(() => {
@@ -41,11 +37,18 @@ export function App() {
     // Cloud Synchronization for multi-device live submissions
     const performCloudSync = async () => {
       const { publications: syncedPubs } = await storageService.syncFromCloud();
-      setAllPublications(syncedPubs);
+      if (syncedPubs) setAllPublications(syncedPubs);
     };
 
     // Initial sync
     performCloudSync();
+
+    // Attach real-time Firebase Firestore listener
+    const unsubPubs = firebaseService.listenToPublications((livePubs) => {
+      if (livePubs && Array.isArray(livePubs)) {
+        setAllPublications(livePubs);
+      }
+    });
 
     // Auto-sync on window focus and every 20 seconds
     const interval = setInterval(performCloudSync, 20000);
@@ -76,6 +79,7 @@ export function App() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('hashchange', handleHashChange);
     return () => {
+      if (unsubPubs) unsubPubs();
       clearInterval(interval);
       window.removeEventListener('focus', performCloudSync);
       window.removeEventListener('keydown', handleKeyDown);

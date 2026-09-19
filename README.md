@@ -1,4 +1,4 @@
-# ?? Project Sthree Shakthi | Digital Platform
+ï»¿# ?? Project Sthree Shakthi | Digital Platform
 
 > **An initiative by Rotaract District 3220 Cluster 05 empowering women across Sri Lanka through confidence, capability, and digital community publishing.**
 
@@ -38,7 +38,7 @@ Developed by **Transformative Matrix Technologies**.
 
 - **Frontend**: React 18, TypeScript, Vite
 - **Styling**: Tailwind CSS, Lucide Icons
-- **Database / Backend Integration**: Turso Cloud (libSQL), IndexedDB
+- **Database / Backend Integration**: Google Firebase Cloud Firestore, IndexedDB
 - **Security**: SHA-256 Web Crypto API
 - **Deployment**: Vercel
 
@@ -72,9 +72,10 @@ npm run build
 ## ?? Partners & Collaborators
 
 - **Together Sri Lanka**
-- **Rotaract District 3220 — Cluster 05**
+- **Rotaract District 3220 ï¿½ Cluster 05**
 - **Transformative Matrix Technologies**
 
 ---
 
-© 2026 Project Sthree Shakthi | Rotaract District 3220 Cluster 05. All Rights Reserved.
+ï¿½ 2026 Project Sthree Shakthi | Rotaract District 3220 Cluster 05. All Rights Reserved.
+

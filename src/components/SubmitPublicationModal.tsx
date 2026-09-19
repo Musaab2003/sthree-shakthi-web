@@ -481,7 +481,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Saving to Turso Cloud...</span>
+                      <span>Saving to Firebase Cloud...</span>
                     </>
                   ) : (
                     <>
