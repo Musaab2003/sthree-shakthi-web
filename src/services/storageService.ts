@@ -1,5 +1,6 @@
 import { Publication, PublicationStatus, DatabaseConfig, AdminAccount } from '../types';
 import { INITIAL_PUBLICATIONS } from '../data/initialPublications';
+import { tursoService } from './tursoService';
 
 const STORAGE_KEY = 'sthree_shakthi_publications_v3';
 const DB_CONFIG_KEY = 'sthree_shakthi_db_config_v2';
@@ -125,7 +126,7 @@ export const storageService = {
     return all.filter(p => p.status === 'pending');
   },
 
-  // 4. Submit a new publication (always pending)
+  // 4. Submit a new publication (works across all laptops via Turso Cloud sync)
   submitPublication(pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>): Publication {
     const pubId = `pub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     
@@ -148,6 +149,12 @@ export const storageService = {
     const all = this.getAllPublications();
     all.unshift(newPub);
     safeSavePublications(all);
+
+    // Sync to Turso Cloud in background
+    tursoService.insertPublication(newPub).catch(err => {
+      console.warn('Turso Cloud publish sync background notice:', err);
+    });
+
     return newPub;
   },
 
@@ -172,6 +179,7 @@ export const storageService = {
       all[index].status = 'approved';
       all[index].approvedAt = new Date().toISOString();
       safeSavePublications(all);
+      tursoService.updatePublicationStatus(id, 'approved').catch(() => {});
       return true;
     }
     return false;
@@ -185,6 +193,7 @@ export const storageService = {
       all[index].status = 'rejected';
       all[index].rejectedReason = reason || 'Does not match editorial criteria.';
       safeSavePublications(all);
+      tursoService.updatePublicationStatus(id, 'rejected', reason).catch(() => {});
       return true;
     }
     return false;
@@ -197,6 +206,7 @@ export const storageService = {
     if (index !== -1) {
       all[index].isFeatured = !all[index].isFeatured;
       safeSavePublications(all);
+      tursoService.togglePublicationFeature(id, all[index].isFeatured || false).catch(() => {});
       return true;
     }
     return false;
@@ -209,6 +219,7 @@ export const storageService = {
     all = all.filter(p => p.id !== id);
     if (all.length !== initialLen) {
       safeSavePublications(all);
+      tursoService.deletePublication(id).catch(() => {});
       return true;
     }
     return false;
@@ -221,6 +232,7 @@ export const storageService = {
     if (index !== -1) {
       all[index] = updatedPub;
       safeSavePublications(all);
+      tursoService.insertPublication(updatedPub).catch(() => {});
       return true;
     }
     return false;
@@ -248,7 +260,6 @@ export const storageService = {
     const alreadyLiked = likedIds.includes(id);
 
     if (alreadyLiked) {
-      // Unlike: decrement count by 1
       all[index].likes = Math.max(0, (all[index].likes || 1) - 1);
       const updatedIds = likedIds.filter(likedId => likedId !== id);
       try {
@@ -257,7 +268,6 @@ export const storageService = {
       safeSavePublications(all);
       return { likes: all[index].likes, isLiked: false };
     } else {
-      // Like (1 time only)
       all[index].likes = (all[index].likes || 0) + 1;
       likedIds.push(id);
       try {
@@ -294,7 +304,7 @@ export const storageService = {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
   },
 
-  // 14. Newsletter Subscriptions & Broadcast Engine
+  // 14. Newsletter Subscriptions & Broadcast Engine (Syncs with Turso Cloud)
   subscribeEmail(email: string): boolean {
     try {
       const subs: string[] = JSON.parse(localStorage.getItem(SUBSCRIBERS_KEY) || '[]');
@@ -303,6 +313,7 @@ export const storageService = {
         subs.push(clean);
         localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(subs));
       }
+      tursoService.insertSubscriber(clean).catch(() => {});
       return true;
     } catch {
       return false;
@@ -324,6 +335,7 @@ export const storageService = {
       subs = subs.filter(s => s.toLowerCase() !== email.trim().toLowerCase());
       if (subs.length !== initial) {
         localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(subs));
+        tursoService.removeSubscriber(email).catch(() => {});
         return true;
       }
       return false;
@@ -383,5 +395,40 @@ export const storageService = {
 
   saveAdminAccount(account: AdminAccount): void {
     localStorage.setItem(ADMIN_ACCOUNT_KEY, JSON.stringify(account));
+  },
+
+  // 17. Multi-Device Cloud Synchronizer
+  async syncFromCloud(): Promise<{ publications: Publication[]; subscribers: string[] }> {
+    try {
+      // 1. Sync remote publications from Turso Cloud
+      const remotePubs = await tursoService.syncAllPublications();
+      let currentPubs = this.getAllPublications();
+      
+      if (remotePubs && Array.isArray(remotePubs)) {
+        const mergedMap = new Map<string, Publication>();
+        remotePubs.forEach(p => mergedMap.set(p.id, p));
+        currentPubs.forEach(p => {
+          if (!mergedMap.has(p.id)) {
+            mergedMap.set(p.id, p);
+          }
+        });
+        currentPubs = Array.from(mergedMap.values());
+        safeSavePublications(currentPubs);
+      }
+
+      // 2. Sync remote subscribers from Turso Cloud
+      const remoteSubs = await tursoService.syncSubscribers();
+      let currentSubs = this.getSubscribers();
+      if (remoteSubs && Array.isArray(remoteSubs)) {
+        const set = new Set([...currentSubs, ...remoteSubs]);
+        currentSubs = Array.from(set);
+        localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(currentSubs));
+      }
+
+      return { publications: currentPubs, subscribers: currentSubs };
+    } catch (err) {
+      console.warn('Cloud sync background note:', err);
+      return { publications: this.getAllPublications(), subscribers: this.getSubscribers() };
+    }
   }
 };

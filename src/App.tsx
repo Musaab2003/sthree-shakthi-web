@@ -38,6 +38,19 @@ export function App() {
     const cfg = storageService.getDatabaseConfig();
     setDbConfig(cfg);
 
+    // Cloud Synchronization for multi-device live submissions
+    const performCloudSync = async () => {
+      const { publications: syncedPubs } = await storageService.syncFromCloud();
+      setAllPublications(syncedPubs);
+    };
+
+    // Initial sync
+    performCloudSync();
+
+    // Auto-sync on window focus and every 20 seconds
+    const interval = setInterval(performCloudSync, 20000);
+    window.addEventListener('focus', performCloudSync);
+
     // 1. Hidden Keyboard Shortcut: Ctrl + Shift + A or Alt + A opens Admin Portal
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -63,6 +76,8 @@ export function App() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('hashchange', handleHashChange);
     return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', performCloudSync);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('hashchange', handleHashChange);
     };

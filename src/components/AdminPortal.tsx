@@ -33,10 +33,14 @@ import {
   Plus,
   FileSpreadsheet,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Database,
+  RefreshCw,
+  Server
 } from 'lucide-react';
-import { Publication, PublicationStatus, AdminAccount } from '../types';
+import { Publication, PublicationStatus, AdminAccount, DatabaseConfig } from '../types';
 import { storageService } from '../services/storageService';
+import { tursoService } from '../services/tursoService';
 import { hashPassword, verifyPassword, generateStrongPassword } from '../utils/crypto';
 
 interface AdminPortalProps {
@@ -73,9 +77,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<PublicationStatus | 'all' | 'settings' | 'newsletter'>('pending');
+  const [activeTab, setActiveTab] = useState<PublicationStatus | 'all' | 'settings' | 'newsletter' | 'database'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState<boolean>(true);
+
+  // Turso Cloud Database State
+  const [dbConfig, setDbConfig] = useState<DatabaseConfig>(storageService.getDatabaseConfig());
+  const [dbUrlInput, setDbUrlInput] = useState(dbConfig.databaseUrl);
+  const [dbTokenInput, setDbTokenInput] = useState(dbConfig.authToken);
+  const [showDbToken, setShowDbToken] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message: string }>({ status: 'idle', message: '' });
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [syncNotice, setSyncNotice] = useState('');
 
   const [adminAccount, setAdminAccount] = useState<AdminAccount>(storageService.getAdminAccount());
   const [editUsername, setEditUsername] = useState(adminAccount.username);
@@ -233,6 +246,56 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     navigator.clipboard.writeText(fullText);
     setCopiedBroadcastToast(true);
     setTimeout(() => setCopiedBroadcastToast(false), 2500);
+  };
+
+  const handleTestCloudConnection = async () => {
+    setDbTestResult({ status: 'testing', message: 'Testing connection to Turso Cloud...' });
+    storageService.saveDatabaseConfig({
+      type: 'turso',
+      databaseUrl: dbUrlInput.trim(),
+      authToken: dbTokenInput.trim(),
+      connected: true
+    });
+    const res = await tursoService.executeQuery('SELECT count(*) as count FROM publications;');
+    if (res.error) {
+      setDbTestResult({ 
+        status: 'error', 
+        message: res.error.includes('Unauthorized') 
+          ? 'Error: Unauthorized. Please generate and paste your Turso Auth Token below.' 
+          : `Connection error: ${res.error}` 
+      });
+    } else {
+      setDbTestResult({ 
+        status: 'success', 
+        message: '🟢 Successfully connected to Turso Cloud (sthree-shakthi-db)! Live Multi-Device Sync is active.' 
+      });
+    }
+  };
+
+  const handleSaveDbSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated: DatabaseConfig = {
+      type: 'turso',
+      databaseUrl: dbUrlInput.trim(),
+      authToken: dbTokenInput.trim(),
+      connected: !!(dbUrlInput.trim() && dbTokenInput.trim()),
+      lastSyncedAt: new Date().toISOString()
+    };
+    storageService.saveDatabaseConfig(updated);
+    setDbConfig(updated);
+    setSyncNotice('Turso database configuration saved successfully!');
+    setTimeout(() => setSyncNotice(''), 3000);
+    handleTestCloudConnection();
+  };
+
+  const handleForceCloudSync = async () => {
+    setIsSyncingCloud(true);
+    setSyncNotice('Connecting to Turso Cloud & syncing all submissions across laptops...');
+    const result = await storageService.syncFromCloud();
+    setSubscribers(result.subscribers);
+    setIsSyncingCloud(false);
+    setSyncNotice(`✅ Synced successfully! ${result.publications.length} publication(s) and ${result.subscribers.length} subscriber(s) loaded.`);
+    setTimeout(() => setSyncNotice(''), 4000);
   };
 
   if (!isOpen) return null;
@@ -630,10 +693,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <KeyRound className="w-3.5 h-3.5" />
                   <span>Password & Hash</span>
                 </button>
+                <button
+                  onClick={() => setActiveTab('database')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeTab === 'database'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-300'
+                  }`}
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>Cloud DB & Multi-Laptop Sync</span>
+                </button>
               </div>
 
               {/* Search (only for publications view) */}
-              {activeTab !== 'settings' && activeTab !== 'newsletter' && (
+              {activeTab !== 'settings' && activeTab !== 'newsletter' && activeTab !== 'database' && (
                 <div className="relative w-full sm:w-64">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                   <input
@@ -796,6 +870,165 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
 
                   </form>
+                </div>
+              </div>
+            ) : activeTab === 'database' ? (
+              /* Tab View 2: Turso Cloud Database & Multi-Laptop Sync */
+              <div className="flex-grow overflow-y-auto p-6 flex justify-center items-start">
+                <div className="max-w-4xl w-full bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
+                  
+                  {/* Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0 border border-emerald-200">
+                        <Database className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-serif text-lg font-bold text-[#3E1028]">
+                            Turso Cloud Database & Multi-Laptop Sync
+                          </h3>
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            Live Multi-Device
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#5C1D3B]/70">
+                          Enables people on other laptops to upload blogs & documents and sync with your admin dashboard in real-time.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleForceCloudSync}
+                      disabled={isSyncingCloud}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingCloud ? 'Syncing...' : 'Force Cloud Sync Now'}</span>
+                    </button>
+                  </div>
+
+                  {/* Sync Notice Banner */}
+                  {syncNotice && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{syncNotice}</span>
+                    </div>
+                  )}
+
+                  {/* Test Status Banner */}
+                  {dbTestResult.status === 'testing' && (
+                    <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                      <span>{dbTestResult.message}</span>
+                    </div>
+                  )}
+
+                  {dbTestResult.status === 'success' && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{dbTestResult.message}</span>
+                    </div>
+                  )}
+
+                  {dbTestResult.status === 'error' && (
+                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                      <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{dbTestResult.message}</span>
+                    </div>
+                  )}
+
+                  {/* Turso Cloud Config Form */}
+                  <form onSubmit={handleSaveDbSettings} className="space-y-4 text-xs">
+                    
+                    {/* Database URL */}
+                    <div className="space-y-1">
+                      <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                        Turso Database URL
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={dbUrlInput}
+                        onChange={(e) => setDbUrlInput(e.target.value)}
+                        placeholder="libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      />
+                    </div>
+
+                    {/* Auth Token */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                          Turso Cloud Auth Token (JWT)
+                        </label>
+                        <a
+                          href="https://turso.tech/app"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-emerald-700 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          <span>Open Turso Dashboard</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showDbToken ? 'text' : 'password'}
+                          value={dbTokenInput}
+                          onChange={(e) => setDbTokenInput(e.target.value)}
+                          placeholder="Paste Turso Auth Token (turso db tokens create sthree-shakthi-db)"
+                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowDbToken(!showDbToken)}
+                          className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
+                        >
+                          {showDbToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-emerald-700" />}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-500 pt-0.5">
+                        Generate via Turso Web Console &rarr; <strong>sthree-shakthi-db</strong> &rarr; <strong>Generate Token</strong> (or CLI: <code>turso db tokens create sthree-shakthi-db</code>).
+                      </p>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleTestCloudConnection}
+                        className="py-3 rounded-full bg-[#FAF2EB] hover:bg-[#F4E5DA] text-[#3E1028] font-bold text-xs border border-[#F4E5DA] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Server className="w-4 h-4 text-emerald-700" />
+                        <span>Test Cloud Connection</span>
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="py-3 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-4 h-4" />
+                        <span>Save & Activate Multi-Device Sync</span>
+                      </button>
+                    </div>
+
+                  </form>
+
+                  {/* Multi-Device Architecture Note */}
+                  <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-slate-700 space-y-2">
+                    <div className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                      <span>How Multi-Device Publishing Works:</span>
+                    </div>
+                    <ul className="list-disc list-inside text-[11px] space-y-1 text-slate-600">
+                      <li>Anyone uploading from other computers submits directly to your central Turso Cloud database.</li>
+                      <li>Submissions appear in your Admin Portal queue under <strong>Pending Review</strong> in real-time.</li>
+                      <li>Once you click <strong>Approve & Publish</strong>, the article goes live immediately across all devices in Sri Lanka and worldwide!</li>
+                    </ul>
+                  </div>
+
                 </div>
               </div>
             ) : activeTab === 'newsletter' ? (
