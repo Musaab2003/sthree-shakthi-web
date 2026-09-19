@@ -839,14 +839,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </button>
                 <button
                   onClick={() => setActiveTab('database')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                     activeTab === 'database'
-                      ? 'bg-emerald-700 text-white shadow-xs'
-                      : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-300'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white text-amber-900 hover:bg-amber-50 border border-amber-300'
                   }`}
                 >
-                  <Database className="w-3.5 h-3.5" />
-                  <span>Cloud DB & Server Hub</span>
+                  <Database className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Firebase Cloud ({publications.length})</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('settings')}
@@ -1359,43 +1359,42 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0 border border-amber-200 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md">
                           <Cloud className="w-6 h-6" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-serif text-lg font-bold text-[#3E1028]">
-                              Google Firebase Cloud Firestore Hub
+                              Google Firebase Live Cloud
                             </h3>
                             <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                              {firebaseService.isConfigured() ? 'Firebase Active' : 'Firebase Ready'}
+                              tsl-sri-shakthi
                             </span>
                           </div>
                           <p className="text-xs text-[#5C1D3B]/70">
-                            Realtime WebSocket & Cloud Firestore distributed database with instant multi-device synchronization.
+                            Real-time multi-device cloud synchronization. All publications, files, and admins are connected globally.
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <a
-                          href="https://console.firebase.google.com"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 transition-all border border-amber-300"
+                        <button
+                          type="button"
+                          onClick={handleTestCloudConnection}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-amber-950 bg-amber-100 hover:bg-amber-200 transition-all border border-amber-300 cursor-pointer"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Firebase Console</span>
-                        </a>
+                          <Server className="w-3.5 h-3.5 text-amber-800" />
+                          <span>Test Connection</span>
+                        </button>
                         <button
                           type="button"
                           onClick={handleForceCloudSync}
                           disabled={isSyncingCloud}
-                          className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
+                          className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                          <span>{isSyncingCloud ? 'Syncing...' : 'Sync Firestore Now'}</span>
+                          <span>{isSyncingCloud ? 'Syncing...' : 'Sync Cloud Now'}</span>
                         </button>
                       </div>
                     </div>
@@ -1430,50 +1429,34 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                     )}
 
-                    {/* Production Infrastructure Metrics */}
+                    {/* Cloud Overview Badges */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Database Engine</div>
-                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
-                          <HardDrive className="w-4 h-4 text-amber-600" />
-                          <span>Firebase Firestore</span>
-                        </div>
-                        <div className="text-[10px] text-emerald-700 font-medium">Real-time WebSocket Listeners</div>
-                      </div>
-
-                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Live Publications</div>
+                        <div className="text-[10px] font-black uppercase text-slate-500">Cloud Publications</div>
                         <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
                           <Layers className="w-4 h-4 text-blue-600" />
-                          <span>{publications.length} Documents</span>
+                          <span>{publications.length} Live Documents</span>
                         </div>
-                        <div className="text-[10px] text-slate-600">Instant Multi-Device Sync</div>
+                        <div className="text-[10px] text-emerald-700 font-medium">Synced in Real-time</div>
                       </div>
 
                       <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
-                        <div className="text-[10px] font-black uppercase text-slate-500">Subscribers Collection</div>
+                        <div className="text-[10px] font-black uppercase text-slate-500">Cloud Subscribers</div>
                         <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
                           <Users className="w-4 h-4 text-[#D95F7F]" />
-                          <span>{subscribers.length} Subscribers</span>
+                          <span>{subscribers.length} Emails</span>
                         </div>
-                        <div className="text-[10px] text-slate-600">Cloud broadcast ready</div>
+                        <div className="text-[10px] text-slate-600">Newsletter ready</div>
                       </div>
-                    </div>
 
-                    {/* Quick Test Connection Button */}
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA]">
-                      <div>
-                        <div className="text-xs font-bold text-[#3E1028]">Live Firestore Connection Diagnostic</div>
-                        <div className="text-[11px] text-slate-500">Ping Firebase servers to verify real-time read and write access</div>
+                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-black uppercase text-slate-500">Authorized Admins</div>
+                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-purple-600" />
+                          <span>{allAdmins.length} Cloud Admins</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600">Global access enabled</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleTestCloudConnection}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs"
-                      >
-                        <Server className="w-3.5 h-3.5" />
-                        <span>Test Firebase Connection</span>
-                      </button>
                     </div>
 
                     {/* Firebase Cloud Credentials Form */}
