@@ -40,6 +40,8 @@ function getTursoEndpoint(rawUrl: string): string {
   return url;
 }
 
+const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODk3OTYxNTQsImlkIjoiMDFhMDdmMmEtM2EwMS03NmY0LWI2ZGUtYzE5YzU3OTY1ZDQ0Iiwia2lkIjoiY1JfdV81RVNLVXJFWTZWejNXMXFXbk5MVGNKeHU2cWZnajlXaFVJOU9MWSIsInJpZCI6ImY5YzUyZGI3LTBhNTItNDhhZC04YWU1LTg5MWZmOWVmYjdlNyJ9.lvfBa8bP0CZHqvzFW1Y1Ush4P5d7iopZKTFarkKjye56R5i7CDbFtqyspyZECyxUSqccoveHtdGbOEANOuZuCw';
+
 export const tursoService = {
   getEffectiveConfig(): { dbUrl: string; token: string } {
     const envUrl = ((import.meta as any).env?.VITE_TURSO_DB_URL as string) || '';
@@ -54,7 +56,7 @@ export const tursoService = {
     } catch {}
 
     const dbUrl = savedUrl || envUrl || 'https://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io';
-    const token = savedToken || envToken;
+    const token = savedToken || envToken || DEFAULT_TURSO_TOKEN;
     return { dbUrl, token };
   },
 
