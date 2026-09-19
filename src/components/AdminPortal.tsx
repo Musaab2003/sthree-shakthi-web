@@ -36,7 +36,15 @@ import {
   Minimize2,
   Database,
   RefreshCw,
-  Server
+  Server,
+  Folder,
+  FolderOpen,
+  HardDrive,
+  Cloud,
+  Layers,
+  ChevronDown,
+  ChevronUp,
+  FileCheck
 } from 'lucide-react';
 import { Publication, PublicationStatus, AdminAccount, DatabaseConfig } from '../types';
 import { storageService } from '../services/storageService';
@@ -77,7 +85,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<PublicationStatus | 'all' | 'settings' | 'newsletter' | 'database'>('pending');
+  const [activeTab, setActiveTab] = useState<PublicationStatus | 'all' | 'files' | 'settings' | 'newsletter' | 'database'>('pending');
+  const [folderFilter, setFolderFilter] = useState<'all' | 'pdf' | 'word' | 'article'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFullScreen, setIsFullScreen] = useState<boolean>(true);
 
@@ -86,6 +95,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [dbUrlInput, setDbUrlInput] = useState(dbConfig.databaseUrl);
   const [dbTokenInput, setDbTokenInput] = useState(dbConfig.authToken);
   const [showDbToken, setShowDbToken] = useState(false);
+  const [showAdvancedDbSettings, setShowAdvancedDbSettings] = useState(false);
   const [dbTestResult, setDbTestResult] = useState<{ status: 'idle' | 'testing' | 'success' | 'error'; message: string }>({ status: 'idle', message: '' });
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
   const [syncNotice, setSyncNotice] = useState('');
@@ -409,8 +419,47 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setSettingsSuccess('Admin credentials updated & hashed successfully!');
   };
 
+  const handleDownloadPublicationFile = async (pub: Publication) => {
+    try {
+      let fileData = pub.fileData;
+      if (!fileData) {
+        fileData = (await storageService.getPublicationFileData(pub.id)) || undefined;
+      }
+      if (fileData) {
+        const a = document.createElement('a');
+        a.href = fileData;
+        a.download = pub.fileName || `${pub.title}.${pub.type === 'word' ? 'docx' : 'pdf'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else if (pub.embedUrl) {
+        window.open(pub.embedUrl, '_blank');
+      } else {
+        const textContent = `${pub.title}\nBy: ${pub.authorName} (${pub.authorEmail})\nRotaract Club: ${pub.authorClub || 'N/A'}\nDate: ${new Date(pub.submittedAt).toLocaleDateString()}\n\nSUMMARY:\n${pub.summary}\n\nCONTENT:\n${pub.content || ''}`;
+        const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${pub.title.replace(/[^a-z0-9]/gi, '_')}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('File download error:', e);
+      if (pub.embedUrl) {
+        window.open(pub.embedUrl, '_blank');
+      }
+    }
+  };
+
   const filteredPubs = publications.filter((p) => {
-    if (activeTab !== 'all' && activeTab !== 'settings' && p.status !== activeTab) {
+    if (activeTab === 'files') {
+      if (folderFilter !== 'all' && p.type !== folderFilter) {
+        return false;
+      }
+    } else if (activeTab !== 'all' && activeTab !== 'settings' && activeTab !== 'database' && activeTab !== 'newsletter' && p.status !== activeTab) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -418,7 +467,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       return (
         p.title.toLowerCase().includes(q) ||
         p.authorName.toLowerCase().includes(q) ||
-        p.authorEmail.toLowerCase().includes(q)
+        p.authorEmail.toLowerCase().includes(q) ||
+        (p.fileName && p.fileName.toLowerCase().includes(q))
       );
     }
     return true;
@@ -427,6 +477,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const pendingCount = publications.filter((p) => p.status === 'pending').length;
   const approvedCount = publications.filter((p) => p.status === 'approved').length;
   const rejectedCount = publications.filter((p) => p.status === 'rejected').length;
+  const pdfCount = publications.filter((p) => p.type === 'pdf').length;
+  const wordCount = publications.filter((p) => p.type === 'word').length;
+  const articleCount = publications.filter((p) => p.type === 'article').length;
+  const filesCount = publications.filter((p) => Boolean(p.fileName || p.embedUrl || p.fileData || p.type === 'pdf' || p.type === 'word')).length;
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 ${
@@ -676,6 +730,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   All ({publications.length})
                 </button>
                 <button
+                  onClick={() => setActiveTab('files')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeTab === 'files'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white text-blue-900 hover:bg-blue-50 border border-blue-200'
+                  }`}
+                >
+                  <Folder className="w-3.5 h-3.5" />
+                  <span>Document Repository ({filesCount})</span>
+                </button>
+                <button
                   onClick={() => setActiveTab('newsletter')}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
                     activeTab === 'newsletter'
@@ -687,17 +752,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <span>Newsletter & Broadcast ({subscribers.length})</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('settings')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                    activeTab === 'settings'
-                      ? 'bg-[#3E1028] text-white shadow-xs'
-                      : 'bg-white text-[#3E1028] hover:bg-slate-100 border border-slate-300'
-                  }`}
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>Password & Hash</span>
-                </button>
-                <button
                   onClick={() => setActiveTab('database')}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
                     activeTab === 'database'
@@ -706,17 +760,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   }`}
                 >
                   <Database className="w-3.5 h-3.5" />
-                  <span>Cloud DB & Multi-Laptop Sync</span>
+                  <span>Cloud DB & Server Hub</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                    activeTab === 'settings'
+                      ? 'bg-[#3E1028] text-white shadow-xs'
+                      : 'bg-white text-[#3E1028] hover:bg-slate-100 border border-slate-300'
+                  }`}
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Password & Security</span>
                 </button>
               </div>
 
-              {/* Search (only for publications view) */}
+              {/* Search (only for publications & files view) */}
               {activeTab !== 'settings' && activeTab !== 'newsletter' && activeTab !== 'database' && (
                 <div className="relative w-full sm:w-64">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    placeholder="Filter submissions..."
+                    placeholder={activeTab === 'files' ? 'Search uploaded files...' : 'Filter submissions...'}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 rounded-full bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/20"
@@ -876,28 +941,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </form>
                 </div>
               </div>
-            ) : activeTab === 'database' ? (
-              /* Tab View 2: Turso Cloud Database & Multi-Laptop Sync */
-              <div className="flex-grow overflow-y-auto p-6 flex justify-center items-start">
-                <div className="max-w-4xl w-full bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
-                  
-                  {/* Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
+            ) : activeTab === 'files' ? (
+              /* Tab View: Document & File Repository */
+              <div className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-6">
+                
+                {/* Header & Folder Stats */}
+                <div className="bg-white p-6 rounded-[32px] border border-[#F4E5DA] shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0 border border-emerald-200">
-                        <Database className="w-6 h-6" />
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0 border border-blue-200">
+                        <FolderOpen className="w-6 h-6" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="font-serif text-lg font-bold text-[#3E1028]">
-                            Turso Cloud Database & Multi-Laptop Sync
+                            Cloud Document & File Repository
                           </h3>
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                            Live Multi-Device
+                          <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold">
+                            Turso Stored Files
                           </span>
                         </div>
                         <p className="text-xs text-[#5C1D3B]/70">
-                          Enables people on other laptops to upload blogs & documents and sync with your admin dashboard in real-time.
+                          Browse, preview, and download all PDF documents, Word files, and articles submitted by contributors.
                         </p>
                       </div>
                     </div>
@@ -906,131 +971,372 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="button"
                       onClick={handleForceCloudSync}
                       disabled={isSyncingCloud}
-                      className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingCloud ? 'Syncing...' : 'Force Cloud Sync Now'}</span>
+                      <span>{isSyncingCloud ? 'Refreshing...' : 'Refresh Files'}</span>
                     </button>
                   </div>
 
-                  {/* Sync Notice Banner */}
-                  {syncNotice && (
-                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{syncNotice}</span>
-                    </div>
-                  )}
-
-                  {/* Test Status Banner */}
-                  {dbTestResult.status === 'testing' && (
-                    <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
-                      <span>{dbTestResult.message}</span>
-                    </div>
-                  )}
-
-                  {dbTestResult.status === 'success' && (
-                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>{dbTestResult.message}</span>
-                    </div>
-                  )}
-
-                  {dbTestResult.status === 'error' && (
-                    <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                      <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span>{dbTestResult.message}</span>
-                    </div>
-                  )}
-
-                  {/* Turso Cloud Config Form */}
-                  <form onSubmit={handleSaveDbSettings} className="space-y-4 text-xs">
-                    
-                    {/* Database URL */}
-                    <div className="space-y-1">
-                      <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                        Turso Database URL
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={dbUrlInput}
-                        onChange={(e) => setDbUrlInput(e.target.value)}
-                        placeholder="libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                      />
-                    </div>
-
-                    {/* Auth Token */}
-                    <div className="space-y-1">
+                  {/* Folder Categories Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div 
+                      onClick={() => setFolderFilter('all')}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                        folderFilter === 'all'
+                          ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30'
+                          : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
+                      }`}
+                    >
                       <div className="flex items-center justify-between">
-                        <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
-                          Turso Cloud Auth Token (JWT)
-                        </label>
-                        <a
-                          href="https://turso.tech/app"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] text-emerald-700 font-bold hover:underline inline-flex items-center gap-1"
-                        >
-                          <span>Open Turso Dashboard</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                        <Folder className="w-5 h-5 text-blue-600" />
+                        <span className="text-xs font-mono font-bold text-blue-800">{publications.length}</span>
                       </div>
-                      <div className="relative">
-                        <input
-                          type={showDbToken ? 'text' : 'password'}
-                          value={dbTokenInput}
-                          onChange={(e) => setDbTokenInput(e.target.value)}
-                          placeholder="Paste Turso Auth Token (turso db tokens create sthree-shakthi-db)"
-                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowDbToken(!showDbToken)}
-                          className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
-                        >
-                          {showDbToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-emerald-700" />}
-                        </button>
+                      <div className="text-xs font-bold text-[#3E1028] pt-2">All Folders</div>
+                      <div className="text-[10px] text-slate-500">Every submission</div>
+                    </div>
+
+                    <div 
+                      onClick={() => setFolderFilter('pdf')}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                        folderFilter === 'pdf'
+                          ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-400/30'
+                          : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <FileText className="w-5 h-5 text-[#D95F7F]" />
+                        <span className="text-xs font-mono font-bold text-[#D95F7F]">{pdfCount}</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 pt-0.5">
-                        Generate via Turso Web Console &rarr; <strong>sthree-shakthi-db</strong> &rarr; <strong>Generate Token</strong> (or CLI: <code>turso db tokens create sthree-shakthi-db</code>).
+                      <div className="text-xs font-bold text-[#3E1028] pt-2">PDF Documents</div>
+                      <div className="text-[10px] text-slate-500">.pdf releases</div>
+                    </div>
+
+                    <div 
+                      onClick={() => setFolderFilter('word')}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                        folderFilter === 'word'
+                          ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30'
+                          : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <FileText className="w-5 h-5 text-blue-600" />
+                        <span className="text-xs font-mono font-bold text-blue-700">{wordCount}</span>
+                      </div>
+                      <div className="text-xs font-bold text-[#3E1028] pt-2">Word Files</div>
+                      <div className="text-[10px] text-slate-500">.docx & .doc docs</div>
+                    </div>
+
+                    <div 
+                      onClick={() => setFolderFilter('article')}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                        folderFilter === 'article'
+                          ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/30'
+                          : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <BookOpen className="w-5 h-5 text-amber-600" />
+                        <span className="text-xs font-mono font-bold text-amber-700">{articleCount}</span>
+                      </div>
+                      <div className="text-xs font-bold text-[#3E1028] pt-2">Articles & Stories</div>
+                      <div className="text-[10px] text-slate-500">Editorial writings</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* File Explorer Directory List */}
+                <div className="space-y-3">
+                  {filteredPubs.length > 0 ? (
+                    filteredPubs.map((pub) => (
+                      <div
+                        key={pub.id}
+                        className="p-4 rounded-2xl bg-white border border-[#F4E5DA] shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group"
+                      >
+                        <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 text-white shadow-2xs ${
+                            pub.type === 'word' ? 'bg-blue-600' : pub.type === 'pdf' ? 'bg-[#D95F7F]' : 'bg-amber-600'
+                          }`}>
+                            {pub.type === 'word' ? 'DOCX' : pub.type === 'pdf' ? 'PDF' : 'DOC'}
+                          </div>
+
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-[#3E1028] truncate max-w-sm sm:max-w-md">
+                                {pub.fileName || `${pub.title}.${pub.type === 'word' ? 'docx' : 'pdf'}`}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                pub.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : pub.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {pub.status}
+                              </span>
+                            </div>
+
+                            <div className="text-xs text-[#5C1D3B]/80 font-medium truncate max-w-sm sm:max-w-md">
+                              {pub.title}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                              <span>By {pub.authorName}</span>
+                              {pub.authorClub && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-[#D95F7F]">{pub.authorClub}</span>
+                                </>
+                              )}
+                              <span>•</span>
+                              <span>{pub.fileSize || `${pub.readTimeMinutes} min read`}</span>
+                              <span>•</span>
+                              <span>{new Date(pub.submittedAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* File Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-[#F4E5DA]">
+                          <button
+                            type="button"
+                            onClick={() => onOpenViewer(pub)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-[#3E1028] bg-[#FAF2EB] hover:bg-[#F4E5DA] border border-[#F4E5DA] transition-all"
+                            title="Preview document in reading modal"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-[#D95F7F]" />
+                            <span>Preview</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPublicationFile(pub)}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-all"
+                            title="Download document file"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download</span>
+                          </button>
+
+                          {pub.status === 'pending' && (
+                            <button
+                              type="button"
+                              onClick={() => onApprove(pub.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs"
+                              title="Approve submission"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Approve</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-16 bg-white rounded-3xl border border-[#F4E5DA] space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                        <Folder className="w-7 h-7" />
+                      </div>
+                      <h4 className="font-serif text-base font-bold text-[#3E1028]">No Documents In This Folder</h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                        When users submit PDF or Word files from any laptop, they will appear in this repository directory in real-time.
                       </p>
                     </div>
+                  )}
+                </div>
 
-                    {/* Action buttons */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              </div>
+            ) : activeTab === 'database' ? (
+              /* Tab View: Production Turso Cloud Hub */
+              <div className="flex-grow overflow-y-auto p-4 sm:p-6 flex justify-center items-start">
+                <div className="max-w-4xl w-full space-y-6">
+                  
+                  {/* Production Cloud Status Card */}
+                  <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-[#F4E5DA] shadow-md space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0 border border-emerald-200 shadow-2xs">
+                          <Cloud className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-serif text-lg font-bold text-[#3E1028]">
+                              Production Cloud Database & Storage Hub
+                            </h3>
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                              Active Cluster
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#5C1D3B]/70">
+                            Enterprise LibSQL distributed database powered by Turso (AWS ap-south-1).
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleForceCloudSync}
+                        disabled={isSyncingCloud}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 transition-all shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                        <span>{isSyncingCloud ? 'Syncing...' : 'Force Cloud Sync Now'}</span>
+                      </button>
+                    </div>
+
+                    {/* Sync Notice Banner */}
+                    {syncNotice && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{syncNotice}</span>
+                      </div>
+                    )}
+
+                    {/* Test Status Banner */}
+                    {dbTestResult.status === 'testing' && (
+                      <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-800 text-xs font-semibold flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                        <span>{dbTestResult.message}</span>
+                      </div>
+                    )}
+
+                    {dbTestResult.status === 'success' && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>{dbTestResult.message}</span>
+                      </div>
+                    )}
+
+                    {dbTestResult.status === 'error' && (
+                      <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                        <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>{dbTestResult.message}</span>
+                      </div>
+                    )}
+
+                    {/* Production Infrastructure Metrics */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-black uppercase text-slate-500">Database Engine</div>
+                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
+                          <HardDrive className="w-4 h-4 text-emerald-700" />
+                          <span>Turso LibSQL v2</span>
+                        </div>
+                        <div className="text-[10px] text-emerald-700 font-medium">AWS South Asia (Mumbai)</div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-black uppercase text-slate-500">Cloud Publications</div>
+                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
+                          <Layers className="w-4 h-4 text-blue-600" />
+                          <span>{publications.length} Records</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600">Syncs every 20 seconds</div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-black uppercase text-slate-500">Subscribers Cloud Table</div>
+                        <div className="text-sm font-bold text-[#3E1028] flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-[#D95F7F]" />
+                          <span>{subscribers.length} Subscribers</span>
+                        </div>
+                        <div className="text-[10px] text-slate-600">Auto-broadcast ready</div>
+                      </div>
+                    </div>
+
+                    {/* Quick Test Connection Button */}
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA]">
+                      <div>
+                        <div className="text-xs font-bold text-[#3E1028]">Live Connection Diagnostic</div>
+                        <div className="text-[11px] text-slate-500">Ping Turso server to verify zero-latency multi-device submissions</div>
+                      </div>
                       <button
                         type="button"
                         onClick={handleTestCloudConnection}
-                        className="py-3 rounded-full bg-[#FAF2EB] hover:bg-[#F4E5DA] text-[#3E1028] font-bold text-xs border border-[#F4E5DA] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs"
                       >
-                        <Server className="w-4 h-4 text-emerald-700" />
-                        <span>Test Cloud Connection</span>
+                        <Server className="w-3.5 h-3.5" />
+                        <span>Run Ping Test</span>
                       </button>
+                    </div>
 
+                    {/* Advanced Cloud Credentials (Collapsible) */}
+                    <div className="border border-[#F4E5DA] rounded-2xl overflow-hidden">
                       <button
-                        type="submit"
-                        className="py-3 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        type="button"
+                        onClick={() => setShowAdvancedDbSettings(!showAdvancedDbSettings)}
+                        className="w-full flex items-center justify-between p-4 bg-[#FAF2EB]/50 hover:bg-[#FAF2EB] transition-colors text-left"
                       >
-                        <Save className="w-4 h-4" />
-                        <span>Save & Activate Multi-Device Sync</span>
+                        <div className="flex items-center gap-2">
+                          <Settings className="w-4 h-4 text-slate-600" />
+                          <span className="text-xs font-bold text-[#3E1028]">
+                            Advanced Connection Credentials (Environment Settings)
+                          </span>
+                        </div>
+                        {showAdvancedDbSettings ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
                       </button>
-                    </div>
 
-                  </form>
+                      {showAdvancedDbSettings && (
+                        <form onSubmit={handleSaveDbSettings} className="p-4 sm:p-6 bg-white space-y-4 text-xs border-t border-[#F4E5DA]">
+                          {/* Database URL */}
+                          <div className="space-y-1">
+                            <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                              Turso Database URL
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={dbUrlInput}
+                              onChange={(e) => setDbUrlInput(e.target.value)}
+                              placeholder="libsql://sthree-shakthi-db-musaab2003.aws-ap-south-1.turso.io"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                            />
+                          </div>
 
-                  {/* Multi-Device Architecture Note */}
-                  <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-slate-700 space-y-2">
-                    <div className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                      <span>How Multi-Device Publishing Works:</span>
+                          {/* Auth Token */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label className="font-bold text-[#3E1028] uppercase tracking-wider text-[11px]">
+                                Turso Cloud Auth Token (JWT)
+                              </label>
+                              <a
+                                href="https://turso.tech/app"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-emerald-700 font-bold hover:underline inline-flex items-center gap-1"
+                              >
+                                <span>Open Turso Dashboard</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                            <div className="relative">
+                              <input
+                                type={showDbToken ? 'text' : 'password'}
+                                value={dbTokenInput}
+                                onChange={(e) => setDbTokenInput(e.target.value)}
+                                placeholder="Paste Turso Auth Token"
+                                className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowDbToken(!showDbToken)}
+                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
+                              >
+                                {showDbToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-emerald-700" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <button
+                              type="submit"
+                              className="w-full py-2.5 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center justify-center gap-1.5"
+                            >
+                              <Save className="w-4 h-4" />
+                              <span>Save & Activate Configuration</span>
+                            </button>
+                          </div>
+                        </form>
+                      )}
                     </div>
-                    <ul className="list-disc list-inside text-[11px] space-y-1 text-slate-600">
-                      <li>Anyone uploading from other computers submits directly to your central Turso Cloud database.</li>
-                      <li>Submissions appear in your Admin Portal queue under <strong>Pending Review</strong> in real-time.</li>
-                      <li>Once you click <strong>Approve & Publish</strong>, the article goes live immediately across all devices in Sri Lanka and worldwide!</li>
-                    </ul>
                   </div>
 
                 </div>

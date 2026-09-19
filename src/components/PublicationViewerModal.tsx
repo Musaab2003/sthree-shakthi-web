@@ -390,9 +390,9 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                     </div>
                   </div>
 
-                  {publication.fileData ? (
+                  {currentFileData ? (
                     <a
-                      href={publication.fileData}
+                      href={currentFileData}
                       download={publication.fileName || `${publication.title}.docx`}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md transition-all"
                     >
