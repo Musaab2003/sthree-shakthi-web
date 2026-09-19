@@ -193,16 +193,6 @@ export const Footer: React.FC<FooterProps> = ({
           
           <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-[#F8CAD5]/60 pt-1">
             <p>Find your voice; Build your future.</p>
-            <span className="hidden sm:inline text-[#F8CAD5]/30">•</span>
-            {/* Admin Portal Button */}
-            <button
-              onClick={onOpenAdminPortal}
-              title="Admin Moderation Portal (or press Ctrl+Shift+A)"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[#F8CAD5] hover:text-white transition-all border border-white/15 text-xs font-semibold shadow-2xs cursor-pointer"
-            >
-              <Lock className="w-3 h-3 text-[#D95F7F]" />
-              <span>Admin Portal</span>
-            </button>
           </div>
         </div>
 
