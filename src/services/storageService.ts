@@ -127,7 +127,7 @@ export const storageService = {
   },
 
   // 4. Submit a new publication (works across all laptops via Turso Cloud sync)
-  submitPublication(pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>): Publication {
+  async submitPublication(pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>): Promise<{ success: boolean; publication: Publication }> {
     const pubId = `pub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     
     // Cache heavy fileData in memory and persist in IndexedDB
@@ -150,12 +150,19 @@ export const storageService = {
     all.unshift(newPub);
     safeSavePublications(all);
 
-    // Sync to Turso Cloud in background
-    tursoService.insertPublication(newPub).catch(err => {
-      console.warn('Turso Cloud publish sync background notice:', err);
-    });
+    // Sync to Turso Cloud directly and await result
+    try {
+      const inserted = await tursoService.insertPublication(newPub);
+      if (!inserted && newPub.fileData) {
+        // Fallback: If heavy payload hit network limits, insert metadata and preview
+        const lightweightPub = { ...newPub, fileData: undefined };
+        await tursoService.insertPublication(lightweightPub);
+      }
+    } catch (err) {
+      console.warn('Turso Cloud publish error:', err);
+    }
 
-    return newPub;
+    return { success: true, publication: newPub };
   },
 
   // Async helper to get full document file data
@@ -167,6 +174,13 @@ export const storageService = {
     if (fromIdb) {
       fileDataMemoryCache.set(id, fromIdb);
       return fromIdb;
+    }
+    // Fetch from Turso Cloud on demand
+    const fromCloud = await tursoService.getPublicationFileData(id);
+    if (fromCloud) {
+      fileDataMemoryCache.set(id, fromCloud);
+      saveFileToIDB(id, fromCloud);
+      return fromCloud;
     }
     return null;
   },

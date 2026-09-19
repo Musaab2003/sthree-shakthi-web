@@ -129,7 +129,7 @@ export const tursoService = {
     const { rows, error } = await this.executeQuery(`
       SELECT 
         id, title, subtitle, author_name, author_email, author_club, category, 
-        type, summary, content, embed_url, file_name, file_size, file_data, 
+        type, summary, content, embed_url, file_name, file_size, 
         cover_image, tags, status, is_featured, submitted_at, approved_at, 
         rejected_reason, views, likes, read_time_minutes
       FROM publications 
@@ -155,8 +155,8 @@ export const tursoService = {
       embedUrl: r.embed_url || undefined,
       fileName: r.file_name || undefined,
       fileSize: r.file_size || undefined,
-      fileData: r.file_data || undefined,
-      coverImage: r.cover_image || '/hero-banner.png',
+      fileData: undefined, // Loaded on-demand via getPublicationFileData to maintain ultra-fast sync
+      coverImage: r.cover_image || '/campaign-poster.jpg',
       tags: r.tags ? String(r.tags).split(',').map(t => t.trim()).filter(Boolean) : [],
       status: (r.status || 'pending') as PublicationStatus,
       isFeatured: r.is_featured === '1' || r.is_featured === 1,
@@ -167,6 +167,15 @@ export const tursoService = {
       likes: Number(r.likes) || 0,
       readTimeMinutes: Number(r.read_time_minutes) || 5
     }));
+  },
+
+  async getPublicationFileData(id: string): Promise<string | null> {
+    if (!this.isConfigured()) return null;
+    const { rows, error } = await this.executeQuery(`
+      SELECT file_data FROM publications WHERE id = ?
+    `, [id]);
+    if (error || !rows || rows.length === 0) return null;
+    return rows[0].file_data || null;
   },
 
   async insertPublication(pub: Publication): Promise<boolean> {

@@ -13,7 +13,7 @@ import { Publication, PublicationType } from '../types';
 interface SubmitPublicationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>) => void;
+  onSubmit: (pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>) => Promise<any> | void;
 }
 
 const DEFAULT_COVER = '/campaign-poster.jpg';
@@ -39,6 +39,8 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
   const [fileData, setFileData] = useState<string>('');
   const [fileSourceMode, setFileSourceMode] = useState<'upload' | 'link'>('upload');
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [submissionId, setSubmissionId] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -87,7 +89,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !authorName.trim() || !authorEmail.trim() || !summary.trim()) {
       alert('Please fill in all required fields (Title, Author Name, Email, Summary).');
@@ -104,9 +106,11 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     }
 
     const generatedId = `SUB-${Math.floor(100000 + Math.random() * 900000)}`;
+    setIsSubmitting(true);
+    setSubmitError('');
 
     try {
-      onSubmit({
+      await onSubmit({
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
         authorName: authorName.trim(),
@@ -127,9 +131,11 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
 
       setSubmissionId(generatedId);
       setSubmittedSuccess(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Submission error:', err);
-      alert('An error occurred while saving the submission. Please try again.');
+      setSubmitError(err?.message || 'An error occurred while saving the submission. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -145,6 +151,8 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     setFileName('');
     setFileSize('');
     setFileData('');
+    setIsSubmitting(false);
+    setSubmitError('');
     setSubmittedSuccess(false);
     onClose();
   };
@@ -449,21 +457,38 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                 />
               </div>
 
+              {submitError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+                  ⚠️ {submitError}
+                </div>
+              )}
+
               {/* Submit CTA */}
               <div className="pt-4 border-t border-[#F4E5DA] flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={handleReset}
-                  className="px-5 py-2.5 rounded-full text-xs font-bold text-[#5C1D3B] hover:bg-slate-100 text-center"
+                  className="px-5 py-2.5 rounded-full text-xs font-bold text-[#5C1D3B] hover:bg-slate-100 disabled:opacity-50 text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center justify-center gap-2 px-6 py-3 sm:py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/30 transition-all hover:scale-102"
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center gap-2 px-6 py-3 sm:py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] disabled:opacity-60 shadow-md shadow-[#D95F7F]/30 transition-all hover:scale-102"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Submit Document for Approval</span>
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving to Turso Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Submit Document for Approval</span>
+                    </>
+                  )}
                 </button>
               </div>
 

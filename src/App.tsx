@@ -106,8 +106,8 @@ export function App() {
     }
   };
 
-  const handleSubmitPublication = (pubData: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>) => {
-    storageService.submitPublication(pubData);
+  const handleSubmitPublication = async (pubData: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>) => {
+    await storageService.submitPublication(pubData);
     const updated = storageService.getAllPublications();
     setAllPublications(updated);
   };
