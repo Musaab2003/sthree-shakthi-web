@@ -57,7 +57,7 @@ export const PublicationCard: React.FC<PublicationCardProps> = ({
   return (
     <div 
       onClick={() => onOpenViewer(publication)}
-      className="group cursor-pointer rounded-3xl bg-white border border-[#F4E5DA] shadow-xs hover:shadow-xl hover:shadow-[#D95F7F]/10 transition-all duration-300 flex flex-col overflow-hidden hover:-translate-y-1.5"
+      className="group cursor-pointer rounded-3xl bg-white border border-[#F4E5DA] shadow-xs hover:shadow-xl hover:shadow-[#D95F7F]/10 transition-all duration-300 flex flex-col overflow-hidden hover:-translate-y-1.5 touch-manipulation active:scale-[0.98] select-none"
     >
       {/* Cover Container (Image or Dynamic Editorial Document Cover) */}
       <div className="relative aspect-[16/10] w-full overflow-hidden">

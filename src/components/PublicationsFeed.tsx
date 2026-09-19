@@ -134,7 +134,14 @@ export const PublicationsFeed: React.FC<PublicationsFeedProps> = ({
                 </div>
 
                 <div className="pt-2">
-                  <button className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-[#3E1028] font-bold text-xs uppercase tracking-wider group-hover:bg-[#FAF2EB] transition-colors shadow-md">
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenViewer(featuredPub);
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-[#3E1028] font-bold text-xs uppercase tracking-wider hover:bg-[#FAF2EB] transition-colors shadow-md cursor-pointer active:scale-95 touch-manipulation"
+                  >
                     <span>View Blog</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </button>

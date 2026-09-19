@@ -159,12 +159,10 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const isArticleType = !isWordType && !isPdfType && !isFlipbookType;
 
   return (
-    <div className={`fixed inset-0 z-[70] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 ${
-      isFullScreen ? 'p-0 sm:p-2' : 'p-2 sm:p-4 md:p-6'
-    }`}>
+    <div className={`fixed inset-0 z-[80] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-3 md:p-6`}>
       <div 
         className={`relative w-full flex flex-col overflow-hidden bg-white shadow-2xl transition-all duration-300 border border-[#F4E5DA] ${
-          isFullScreen ? 'h-full w-full max-w-[1920px] rounded-none sm:rounded-3xl' : 'max-w-5xl h-[92vh] rounded-[32px]'
+          isFullScreen ? 'h-full w-full max-w-[1920px] rounded-none sm:rounded-3xl' : 'max-w-5xl h-[100dvh] sm:h-[92vh] rounded-none sm:rounded-[32px]'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -383,14 +381,16 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                   </span>
                   
                   <div className="flex items-center gap-2">
-                    <a
-                      href={effectivePdfUrl}
-                      download={publication.fileName || `${publication.title}.pdf`}
-                      className="px-3.5 py-1.5 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs"
-                    >
-                      <Download className="w-3 h-3" />
-                      <span>Download PDF</span>
-                    </a>
+                    {isAdminView && (
+                      <a
+                        href={effectivePdfUrl}
+                        download={publication.fileName || `${publication.title}.pdf`}
+                        className="px-3.5 py-1.5 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download PDF</span>
+                      </a>
+                    )}
                     <a
                       href={effectivePdfUrl}
                       target="_blank"
@@ -520,7 +520,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                     </div>
                   </div>
 
-                  {currentFileData ? (
+                  {isAdminView && currentFileData ? (
                     <a
                       href={currentFileData}
                       download={publication.fileName || `${publication.title}.docx`}

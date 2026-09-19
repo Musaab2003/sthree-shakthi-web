@@ -1075,9 +1075,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                   {/* Folder Categories Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div 
+                    <button 
+                      type="button"
                       onClick={() => setFolderFilter('all')}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-left w-full touch-manipulation active:scale-95 ${
                         folderFilter === 'all'
                           ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30'
                           : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
@@ -1089,11 +1090,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                       <div className="text-xs font-bold text-[#3E1028] pt-2">All Folders</div>
                       <div className="text-[10px] text-slate-500">Every submission</div>
-                    </div>
+                    </button>
 
-                    <div 
+                    <button 
+                      type="button"
                       onClick={() => setFolderFilter('pdf')}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-left w-full touch-manipulation active:scale-95 ${
                         folderFilter === 'pdf'
                           ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-400/30'
                           : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
@@ -1105,11 +1107,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                       <div className="text-xs font-bold text-[#3E1028] pt-2">PDF Documents</div>
                       <div className="text-[10px] text-slate-500">.pdf releases</div>
-                    </div>
+                    </button>
 
-                    <div 
+                    <button 
+                      type="button"
                       onClick={() => setFolderFilter('word')}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-left w-full touch-manipulation active:scale-95 ${
                         folderFilter === 'word'
                           ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30'
                           : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
@@ -1121,11 +1124,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                       <div className="text-xs font-bold text-[#3E1028] pt-2">Word Files</div>
                       <div className="text-[10px] text-slate-500">.docx & .doc docs</div>
-                    </div>
+                    </button>
 
-                    <div 
+                    <button 
+                      type="button"
                       onClick={() => setFolderFilter('article')}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-left w-full touch-manipulation active:scale-95 ${
                         folderFilter === 'article'
                           ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/30'
                           : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
@@ -1137,7 +1141,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                       <div className="text-xs font-bold text-[#3E1028] pt-2">Articles & Stories</div>
                       <div className="text-[10px] text-slate-500">Editorial writings</div>
-                    </div>
+                    </button>
                   </div>
                 </div>
 
