@@ -400,7 +400,7 @@ export const storageService = {
     localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(config));
   },
 
-  // 16. Admin Account Management with Hashed Passwords
+  // 16. Admin Account Management with Hashed Passwords & Cloud Sync
   getAdminAccount(): AdminAccount {
     try {
       const data = localStorage.getItem(ADMIN_ACCOUNT_KEY);
@@ -412,12 +412,39 @@ export const storageService = {
     }
   },
 
+  getAllAdmins(): AdminAccount[] {
+    try {
+      const data = localStorage.getItem('sthree_shakthi_all_admins_v1');
+      if (data) {
+        const list: AdminAccount[] = JSON.parse(data);
+        if (list.length > 0) return list;
+      }
+    } catch {}
+    return [this.getAdminAccount()];
+  },
+
   saveAdminAccount(account: AdminAccount): void {
     localStorage.setItem(ADMIN_ACCOUNT_KEY, JSON.stringify(account));
+    let all = this.getAllAdmins();
+    const idx = all.findIndex(a => a.username.toLowerCase() === account.username.toLowerCase());
+    if (idx !== -1) {
+      all[idx] = account;
+    } else {
+      all.push(account);
+    }
+    localStorage.setItem('sthree_shakthi_all_admins_v1', JSON.stringify(all));
+    firebaseService.saveAdmin(account).catch(() => {});
+  },
+
+  deleteAdminAccount(username: string): void {
+    let all = this.getAllAdmins();
+    all = all.filter(a => a.username.toLowerCase() !== username.toLowerCase());
+    localStorage.setItem('sthree_shakthi_all_admins_v1', JSON.stringify(all));
+    firebaseService.deleteAdmin(username).catch(() => {});
   },
 
   // 17. Multi-Device Cloud Synchronizer
-  async syncFromCloud(): Promise<{ publications: Publication[]; subscribers: string[] }> {
+  async syncFromCloud(): Promise<{ publications: Publication[]; subscribers: string[]; admins: AdminAccount[] }> {
     try {
       // 1. Sync remote publications from Firebase Cloud Firestore
       const remotePubs = await firebaseService.syncAllPublications();
@@ -449,10 +476,24 @@ export const storageService = {
         localStorage.setItem(SUBSCRIBERS_KEY, JSON.stringify(currentSubs));
       }
 
-      return { publications: currentPubs, subscribers: currentSubs };
+      // 3. Sync remote admins from Firebase Cloud Firestore
+      const remoteAdmins = await firebaseService.getAdmins();
+      let currentAdmins = this.getAllAdmins();
+      if (remoteAdmins.length > 0) {
+        const adminMap = new Map<string, AdminAccount>();
+        remoteAdmins.forEach(a => adminMap.set(a.username.toLowerCase(), a));
+        currentAdmins = Array.from(adminMap.values());
+        localStorage.setItem('sthree_shakthi_all_admins_v1', JSON.stringify(currentAdmins));
+      } else {
+        // Seed default admin to Firestore if empty
+        const def = this.getAdminAccount();
+        firebaseService.saveAdmin(def).catch(() => {});
+      }
+
+      return { publications: currentPubs, subscribers: currentSubs, admins: currentAdmins };
     } catch (err) {
       console.warn('Cloud sync background note:', err);
-      return { publications: this.getAllPublications(), subscribers: this.getSubscribers() };
+      return { publications: this.getAllPublications(), subscribers: this.getSubscribers(), admins: this.getAllAdmins() };
     }
   }
 };

@@ -14,7 +14,7 @@ import {
   Firestore,
   Unsubscribe 
 } from 'firebase/firestore';
-import { Publication, PublicationStatus, FirebaseConfig } from '../types';
+import { Publication, PublicationStatus, FirebaseConfig, AdminAccount } from '../types';
 
 const STORAGE_KEY = 'sthree_shakthi_firebase_config_v1';
 
@@ -347,5 +347,59 @@ export const firebaseService = {
       console.error('Firebase removeSubscriber error:', err);
       return false;
     }
+  },
+
+  // 4. Admin Accounts Collection in Firestore
+  async getAdmins(): Promise<AdminAccount[]> {
+    const db = this.getDb();
+    if (!db) return [];
+    try {
+      const snap = await getDocs(collection(db, 'admins'));
+      if (snap.empty) return [];
+      return snap.docs.map(d => {
+        const data = d.data();
+        return {
+          username: d.id,
+          email: data.email || '',
+          passwordHash: data.passwordHash || data.password || '',
+          updatedAt: data.updatedAt || new Date().toISOString()
+        };
+      });
+    } catch (e) {
+      console.warn('Error fetching admins from Firebase:', e);
+      return [];
+    }
+  },
+
+  async saveAdmin(account: AdminAccount): Promise<boolean> {
+    const db = this.getDb();
+    if (!db) return false;
+    try {
+      const cleanUser = account.username.trim().toLowerCase();
+      await setDoc(doc(db, 'admins', cleanUser), {
+        username: cleanUser,
+        email: account.email || '',
+        passwordHash: account.passwordHash,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return true;
+    } catch (err) {
+      console.error('Firebase saveAdmin error:', err);
+      return false;
+    }
+  },
+
+  async deleteAdmin(username: string): Promise<boolean> {
+    const db = this.getDb();
+    if (!db) return false;
+    try {
+      const cleanUser = username.trim().toLowerCase();
+      await deleteDoc(doc(db, 'admins', cleanUser));
+      return true;
+    } catch (err) {
+      console.error('Firebase deleteAdmin error:', err);
+      return false;
+    }
   }
 };
+
