@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 580" width="100%" height="100%">
+  <defs>
+    <!-- Sky & Sun Gradients -->
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFB3D9"/>
+      <stop offset="60%" stop-color="#FF75B5"/>
+      <stop offset="100%" stop-color="#E12A88"/>
+    </linearGradient>
+
+    <!-- Glowing Sun Disc -->
+    <radialGradient id="sunDisc" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="70%" stop-color="#FFF0F7"/>
+      <stop offset="100%" stop-color="#FFCCE6"/>
+    </radialGradient>
+
+    <!-- Mountain Hills -->
+    <linearGradient id="hillGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6B1348"/>
+      <stop offset="100%" stop-color="#4A0B30"/>
+    </linearGradient>
+
+    <!-- Woman 1 (Back / Soft Pink) -->
+    <linearGradient id="womanBack" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFC2E2"/>
+      <stop offset="100%" stop-color="#FFA8D3"/>
+    </linearGradient>
+
+    <!-- Woman 2 (Center Bun / Vivid Magenta) -->
+    <linearGradient id="womanCenter" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E61E8C"/>
+      <stop offset="100%" stop-color="#C20D70"/>
+    </linearGradient>
+
+    <!-- Woman 3 (Front / Deep Plum Violet) -->
+    <linearGradient id="womanFront" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8C0D5E"/>
+      <stop offset="100%" stop-color="#540838"/>
+    </linearGradient>
+
+    <!-- Path Curves Gradient -->
+    <linearGradient id="pathGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFBFE1"/>
+      <stop offset="50%" stop-color="#FFA6D5"/>
+      <stop offset="100%" stop-color="#FF85C2"/>
+    </linearGradient>
+
+    <!-- Typography Gradient -->
+    <linearGradient id="brandTextGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#D91A80"/>
+      <stop offset="40%" stop-color="#B8146A"/>
+      <stop offset="100%" stop-color="#581C87"/>
+    </linearGradient>
+
+    <!-- Arch Clip Window -->
+    <clipPath id="archShape">
+      <path d="M 70 380 L 70 190 A 180 180 0 0 1 430 190 L 430 380 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Clean Vector Drawing without any shadows -->
+  <g id="logo-emblem">
+    <!-- Arch Window -->
+    <g clip-path="url(#archShape)">
+      <!-- Sky Background -->
+      <rect x="60" y="0" width="380" height="390" fill="url(#skyGrad)"/>
+
+      <!-- Sun Rays (Crisp Solid White) -->
+      <g stroke="#FFFFFF" stroke-width="8" stroke-linecap="round">
+        <line x1="250" y1="180" x2="250" y2="15" />
+        <line x1="250" y1="180" x2="175" y2="30" />
+        <line x1="250" y1="180" x2="325" y2="30" />
+        <line x1="250" y1="180" x2="110" y2="80" />
+        <line x1="250" y1="180" x2="390" y2="80" />
+        <line x1="250" y1="180" x2="70" y2="150" />
+        <line x1="250" y1="180" x2="430" y2="150" />
+      </g>
+
+      <!-- Rising Sun Disc -->
+      <circle cx="250" cy="180" r="82" fill="url(#sunDisc)"/>
+
+      <!-- Rolling Hills -->
+      <path d="M 60 265 Q 180 215 280 250 Q 360 230 440 275 L 440 390 L 60 390 Z" fill="url(#hillGrad)"/>
+
+      <!-- 3 Silhouettes of Women -->
+      <!-- 1. Left Woman (Flowing hair) -->
+      <path d="M 70 390 L 70 240 C 90 230 110 215 125 180 C 135 150 165 145 180 165 C 195 180 200 205 205 225 C 215 255 235 275 250 305 C 260 325 260 355 260 390 Z" fill="url(#womanBack)"/>
+
+      <!-- 2. Middle Woman (Hair Bun) -->
+      <circle cx="250" cy="175" r="24" fill="url(#womanCenter)"/>
+      <path d="M 210 390 C 210 320 225 275 245 230 C 255 210 270 195 285 200 C 300 205 300 225 300 250 C 300 285 315 320 325 390 Z" fill="url(#womanCenter)"/>
+
+      <!-- 3. Right Woman -->
+      <path d="M 285 390 C 290 335 300 300 325 265 C 335 248 350 238 365 248 C 380 258 375 288 370 310 C 375 335 400 355 440 365 L 440 390 Z" fill="url(#womanFront)"/>
+
+      <!-- Radiating Roads (Path to Future) -->
+      <g fill="url(#pathGrad)">
+        <path d="M 70 375 Q 180 280 345 255 Q 235 305 70 390 Z"/>
+        <path d="M 120 390 Q 235 295 375 270 Q 275 320 160 390 Z"/>
+        <path d="M 205 390 Q 300 305 410 290 Q 325 335 265 390 Z"/>
+        <path d="M 310 390 Q 370 325 435 315 Q 385 355 355 390 Z"/>
+      </g>
+    </g>
+
+    <!-- Outer Arch Frame Contour -->
+    <path d="M 70 380 L 70 190 A 180 180 0 0 1 430 190 L 430 380 Z" fill="none" stroke="#D91A80" stroke-width="5"/>
+
+    <!-- Clear Typographic Script "ස්ත්‍රී SHAKTHI" with zero shadows -->
+    <g transform="translate(0, 400)">
+      <!-- Sinhala Script: ස්ත්‍රී -->
+      <text x="65" y="70" font-family="'Plus Jakarta Sans', 'Noto Sans Sinhala', 'Inter', sans-serif" font-size="70" font-weight="900" fill="url(#brandTextGrad)" letter-spacing="1">ස්ත්‍රී</text>
+      
+      <!-- English Script: SHAKTHI -->
+      <text x="210" y="70" font-family="'Plus Jakarta Sans', sans-serif" font-size="58" font-weight="900" fill="url(#brandTextGrad)" letter-spacing="3">SHAKTHI</text>
+
+      <!-- Tagline -->
+      <text x="250" y="110" font-family="'Plus Jakarta Sans', sans-serif" font-size="16" font-weight="800" fill="#7E22CE" text-anchor="middle" letter-spacing="3">FIND YOUR VOICE. BUILD YOUR FUTURE.</text>
+    </g>
+  </g>
+</svg>

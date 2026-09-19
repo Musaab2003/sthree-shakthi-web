@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: #FDF9F6;
+    color: #3E1028;
+  }
+  h1, h2, h3, .font-serif {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF2EB;
+}
+::-webkit-scrollbar-thumb {
+  background: #E8829C;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D95F7F;
+}
+
+/* Luxury card with gentle shadow */
+.femine-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(232, 130, 156, 0.15);
+  box-shadow: 0 10px 35px -5px rgba(92, 29, 59, 0.04);
+}
+
+.femine-card-active {
+  background: #D95F7F;
+  color: #FFFFFF;
+  box-shadow: 0 14px 40px -5px rgba(217, 95, 127, 0.35);
+}
+
+/* Organic Arch Frames */
+.arch-frame-tr {
+  border-radius: 40px 120px 40px 40px;
+}
+.arch-frame-tl {
+  border-radius: 120px 40px 40px 40px;
+}
+
+/* Washi Tape Decorator */
+.washi-tape {
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transform: rotate(-3deg);
+}
+
+/* Sparkle Star */
+.sparkle-icon {
+  filter: drop-shadow(0 2px 4px rgba(217, 95, 127, 0.2));
+}
