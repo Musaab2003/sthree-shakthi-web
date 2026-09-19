@@ -118,6 +118,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     const acc = storageService.getAdminAccount();
     setAdminAccount(acc);
     setEditUsername(acc.username);
+    const cfg = storageService.getDatabaseConfig();
+    setDbConfig(cfg);
+    setDbUrlInput(cfg.databaseUrl);
+    setDbTokenInput(cfg.authToken);
     setSubscribers(storageService.getSubscribers());
     setBroadcastHistory(storageService.getBroadcastHistory());
   }, [isOpen]);

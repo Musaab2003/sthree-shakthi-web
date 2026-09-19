@@ -384,7 +384,22 @@ export const storageService = {
   getDatabaseConfig(): DatabaseConfig {
     try {
       const data = localStorage.getItem(DB_CONFIG_KEY);
-      if (data) return JSON.parse(data);
+      if (data) {
+        const parsed = JSON.parse(data);
+        let modified = false;
+        if (!parsed.authToken) {
+          parsed.authToken = DEFAULT_DB_CONFIG.authToken;
+          modified = true;
+        }
+        if (!parsed.databaseUrl) {
+          parsed.databaseUrl = DEFAULT_DB_CONFIG.databaseUrl;
+          modified = true;
+        }
+        if (modified) {
+          localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
       localStorage.setItem(DB_CONFIG_KEY, JSON.stringify(DEFAULT_DB_CONFIG));
       return DEFAULT_DB_CONFIG;
     } catch (e) {}
