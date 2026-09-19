@@ -271,24 +271,33 @@ export const storageService = {
 
     const likedIds = this.getUserLikedIds();
     const alreadyLiked = likedIds.includes(id);
+    let newLikes = Number(all[index].likes) || 0;
+    let isLiked = false;
 
     if (alreadyLiked) {
-      all[index].likes = Math.max(0, (all[index].likes || 1) - 1);
+      newLikes = Math.max(0, newLikes - 1);
       const updatedIds = likedIds.filter(likedId => likedId !== id);
       try {
         localStorage.setItem(USER_LIKES_KEY, JSON.stringify(updatedIds));
       } catch {}
+      all[index].likes = newLikes;
       safeSavePublications(all);
-      return { likes: all[index].likes, isLiked: false };
+      isLiked = false;
     } else {
-      all[index].likes = (all[index].likes || 0) + 1;
+      newLikes = newLikes + 1;
       likedIds.push(id);
       try {
         localStorage.setItem(USER_LIKES_KEY, JSON.stringify(likedIds));
       } catch {}
+      all[index].likes = newLikes;
       safeSavePublications(all);
-      return { likes: all[index].likes, isLiked: true };
+      isLiked = true;
     }
+
+    // Real-time synchronization to Firebase Cloud
+    firebaseService.updatePublicationLikes(id, newLikes).catch(() => {});
+
+    return { likes: newLikes, isLiked };
   },
 
   likePublication(id: string): number {
@@ -302,6 +311,7 @@ export const storageService = {
     if (index !== -1) {
       all[index].views = (all[index].views || 0) + 1;
       safeSavePublications(all);
+      firebaseService.incrementPublicationViews(id).catch(() => {});
       return all[index].views;
     }
     return 0;

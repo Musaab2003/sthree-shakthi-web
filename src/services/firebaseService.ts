@@ -11,6 +11,7 @@ import {
   onSnapshot, 
   query, 
   orderBy, 
+  increment,
   Firestore,
   Unsubscribe 
 } from 'firebase/firestore';
@@ -262,6 +263,32 @@ export const firebaseService = {
       return true;
     } catch (err) {
       console.error('Firebase togglePublicationFeature error:', err);
+      return false;
+    }
+  },
+
+  async updatePublicationLikes(id: string, likes: number): Promise<boolean> {
+    const db = this.getDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'publications', id);
+      await updateDoc(docRef, { likes: Math.max(0, likes) });
+      return true;
+    } catch (err) {
+      console.warn('Firebase updatePublicationLikes notice:', err);
+      return false;
+    }
+  },
+
+  async incrementPublicationViews(id: string): Promise<boolean> {
+    const db = this.getDb();
+    if (!db) return false;
+    try {
+      const docRef = doc(db, 'publications', id);
+      await updateDoc(docRef, { views: increment(1) });
+      return true;
+    } catch (err) {
+      console.warn('Firebase incrementPublicationViews notice:', err);
       return false;
     }
   },

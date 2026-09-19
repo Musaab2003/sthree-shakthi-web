@@ -10,6 +10,7 @@ import {
   Share2
 } from 'lucide-react';
 import { Publication, PublicationCategory } from '../types';
+import { storageService } from '../services/storageService';
 
 interface PublicationCardProps {
   publication: Publication;
@@ -157,19 +158,28 @@ export const PublicationCard: React.FC<PublicationCardProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => onLike(publication.id, e)}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-rose-600 transition-colors p-1"
-              title="Like this publication"
-            >
-              <Heart className={`w-4 h-4 transition-transform active:scale-125 ${
-                publication.likes > 0 
-                  ? 'text-[#D95F7F] fill-[#D95F7F]' 
-                  : 'text-slate-400'
-              }`} />
-              <span className="text-xs font-semibold">{publication.likes || 0}</span>
-            </button>
+            {(() => {
+              const isLikedByMe = storageService.hasUserLiked(publication.id);
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => onLike(publication.id, e)}
+                  className={`flex items-center gap-1.5 transition-all px-2 py-1 rounded-full ${
+                    isLikedByMe 
+                      ? 'text-[#D95F7F] bg-rose-50 hover:bg-rose-100 font-bold' 
+                      : 'text-slate-400 hover:text-[#D95F7F] hover:bg-rose-50/60'
+                  }`}
+                  title={isLikedByMe ? 'Unlike this publication' : 'Like this publication'}
+                >
+                  <Heart className={`w-4 h-4 transition-transform active:scale-130 ${
+                    isLikedByMe 
+                      ? 'text-[#D95F7F] fill-[#D95F7F]' 
+                      : 'text-slate-400'
+                  }`} />
+                  <span className="text-xs font-semibold">{publication.likes || 0}</span>
+                </button>
+              );
+            })()}
 
             <span className="flex items-center gap-1 text-slate-400 p-1">
               <Eye className="w-3.5 h-3.5" />
