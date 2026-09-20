@@ -52,49 +52,49 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Logo Brand with Authentic Logos */}
           <div 
             onClick={() => handleNavClick('hero')} 
-            className="flex items-center gap-3 sm:gap-4 cursor-pointer group"
+            className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group select-none"
           >
             {/* Sthree Shakthi Logo */}
-            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-transparent flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-transparent flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <img src="/logo.png" alt="Sthree Shakthi Logo" className="w-full h-full object-contain" />
             </div>
 
             {/* Brand Title */}
             <div className="flex flex-col justify-center">
-              <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[#3E1028] italic leading-tight">
+              <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[#3E1028] italic leading-none">
                 Sthree <span className="text-[#D95F7F] not-italic font-normal">Shakthi</span>
               </span>
-              <span className="text-[8.5px] sm:text-[10px] uppercase tracking-widest text-[#9E324F] font-bold">
+              <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-widest text-[#9E324F] font-bold mt-1 leading-none">
                 Cluster 05 • District 3220
               </span>
             </div>
 
             {/* Clean Divider */}
-            <div className="hidden lg:block h-10 w-[1.5px] bg-[#D95F7F]/30 mx-1" />
+            <div className="hidden lg:block h-8 w-[1.5px] bg-[#D95F7F]/25 mx-2" />
 
             {/* Partner Logo 1: Together Sri Lanka */}
-            <div className="hidden lg:flex items-center h-11 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" title="Together Sri Lanka">
-              <img src="/together-sl-logo.png" alt="Together Sri Lanka Logo" className="h-full w-auto object-contain" />
+            <div className="hidden lg:flex items-center h-10 shrink-0 group-hover:scale-105 transition-transform" title="Together Sri Lanka">
+              <img src="/together-sl-logo.png" alt="Together Sri Lanka Logo" className="h-full w-auto object-contain max-h-9" />
             </div>
 
             {/* Partner Logo 2: Rotaract */}
-            <div className="hidden lg:flex items-center h-8 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" title="Rotaract District 3220">
-              <img src="/rotaract-logo.png" alt="Rotaract Logo" className="h-full w-auto object-contain" />
+            <div className="hidden lg:flex items-center h-8 shrink-0 group-hover:scale-105 transition-transform" title="Rotaract District 3220">
+              <img src="/rotaract-logo.png" alt="Rotaract Logo" className="h-full w-auto object-contain max-h-7" />
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8">
             {navLinks.map((link) => {
               const isActive = activeSection === link.id;
               return (
                 <button
                   key={link.id}
                   onClick={() => handleNavClick(link.id)}
-                  className={`text-sm font-medium transition-colors tracking-wide cursor-pointer ${
+                  className={`text-sm tracking-wide cursor-pointer transition-all ${
                     isActive
                       ? 'text-[#D95F7F] font-bold border-b-2 border-[#D95F7F] pb-0.5'
-                      : 'text-[#5C1D3B]/80 hover:text-[#D95F7F]'
+                      : 'text-[#5C1D3B]/80 font-medium hover:text-[#D95F7F]'
                   }`}
                 >
                   {link.label}
@@ -109,14 +109,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenDashboard}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs hover:scale-102 transition-all cursor-pointer"
+                className="h-10 flex items-center gap-2 px-4 rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs hover:scale-102 transition-all cursor-pointer"
                 title="Open your contributor dashboard"
               >
                 <div className="w-6 h-6 rounded-full bg-[#D95F7F] text-white flex items-center justify-center text-[10px] font-bold uppercase">
                   {currentUser.name.slice(0, 2)}
                 </div>
                 <span className="max-w-[120px] truncate">{currentUser.name.split(' ')[0]}</span>
-                <span className="px-1.5 py-0.5 rounded-full bg-[#D95F7F]/15 text-[#D95F7F] text-[9px] font-extrabold uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-[#D95F7F]/15 text-[#D95F7F] text-[9px] font-extrabold uppercase tracking-wide">
                   Dashboard
                 </span>
               </button>
@@ -124,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenAuthModal}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-[#5C1D3B] hover:text-[#D95F7F] bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs transition-all cursor-pointer"
+                className="h-10 flex items-center gap-2 px-4 rounded-full text-xs font-bold text-[#5C1D3B] hover:text-[#D95F7F] bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs transition-all cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In / Register</span>
@@ -133,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={onOpenSubmitModal}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/25 hover:scale-102 transition-all cursor-pointer"
+              className="h-10 flex items-center gap-2 px-5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/20 hover:scale-102 transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Submit Blog</span>
@@ -153,7 +153,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <button
                 onClick={onOpenAuthModal}
-                className="p-2 rounded-full bg-white text-[#5C1D3B] border border-[#F4E5DA]"
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-white text-[#5C1D3B] border border-[#F4E5DA] shadow-2xs"
                 title="Sign In"
               >
                 <User className="w-4 h-4" />
@@ -162,16 +162,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={onOpenSubmitModal}
-              className="p-2 rounded-full bg-[#D95F7F] text-white"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-[#D95F7F] text-white shadow-2xs"
               title="Submit Blog"
             >
               <PlusCircle className="w-4 h-4" />
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl text-[#3E1028] hover:bg-rose-50"
+              className="w-9 h-9 flex items-center justify-center rounded-xl text-[#3E1028] hover:bg-rose-50"
+              aria-label="Toggle Navigation"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>

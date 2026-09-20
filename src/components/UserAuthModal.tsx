@@ -96,11 +96,13 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
         regClub
       );
       if (res.success && res.user) {
-        setSuccessMsg(`Account created successfully! Welcome, ${res.user.name}!`);
-        setTimeout(() => {
-          onSuccess(res.user!);
-          onClose();
-        }, 900);
+        setSuccessMsg('Account registered successfully! Please enter your password to sign in.');
+        setLoginEmail(regEmail.trim().toLowerCase());
+        setLoginPassword('');
+        setMode('login');
+        setRegPassword('');
+        setRegName('');
+        setRegClub('');
       } else {
         setErrorMsg(res.message || 'Registration failed. Please try again.');
       }

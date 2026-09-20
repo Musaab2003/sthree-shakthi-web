@@ -648,7 +648,6 @@ export const storageService = {
     };
 
     this.saveUserAccount(newUser);
-    this.setCurrentUser(newUser, true);
     return { success: true, user: newUser };
   },
 
