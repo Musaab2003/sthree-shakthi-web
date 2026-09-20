@@ -690,6 +690,61 @@ export const firebaseService = {
     }
   },
 
+  // 6. Registration Email OTP Verification Storage
+  async saveEmailOtp(email: string, otp: string, expiresAt: number): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !email || !otp) return false;
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const docId = cleanEmail.replace(/\./g, '___');
+      await setDoc(doc(db, 'email_otps', docId), {
+        email: cleanEmail,
+        otp: String(otp).trim(),
+        expiresAt,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
+      return true;
+    } catch (e) {
+      console.warn('Firebase saveEmailOtp notice:', e);
+      return false;
+    }
+  },
+
+  async getStoredOtp(email: string): Promise<{ otp: string; expiresAt: number } | null> {
+    const db = this.getDb();
+    if (!db || !email) return null;
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const docId = cleanEmail.replace(/\./g, '___');
+      const snap = await getDoc(doc(db, 'email_otps', docId));
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          otp: String(data.otp || ''),
+          expiresAt: Number(data.expiresAt) || 0
+        };
+      }
+      return null;
+    } catch (e) {
+      console.warn('Firebase getStoredOtp notice:', e);
+      return null;
+    }
+  },
+
+  async deleteEmailOtp(email: string): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !email) return false;
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const docId = cleanEmail.replace(/\./g, '___');
+      await deleteDoc(doc(db, 'email_otps', docId));
+      return true;
+    } catch (e) {
+      console.warn('Firebase deleteEmailOtp notice:', e);
+      return false;
+    }
+  },
+
   // 12. Notification Operations
   async saveNotification(notif: UserNotification): Promise<boolean> {
     const db = this.getDb();

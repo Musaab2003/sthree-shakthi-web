@@ -1,13 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   Sparkles, 
-  Send, 
-  CheckCircle2, 
   Heart, 
   BookOpen, 
   Lock
 } from 'lucide-react';
-import { storageService } from '../services/storageService';
 
 interface FooterProps {
   onOpenSubmitModal: () => void;
@@ -20,18 +17,6 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenAdminPortal,
   setActiveSection,
 }) => {
-  const [email, setEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-
-  const handleSubscribe = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim() && email.includes('@')) {
-      storageService.subscribeEmail(email);
-      setSubscribed(true);
-      setEmail('');
-    }
-  };
-
   const scrollToSection = (id: string) => {
     setActiveSection(id);
     const el = document.getElementById(id);
@@ -41,55 +26,8 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   return (
-    <footer className="bg-[#3E1028] text-white pt-16 pb-12 border-t border-[#5C1D3B]">
+    <footer className="bg-[#3E1028] text-white pt-14 pb-12 border-t border-[#5C1D3B]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Top Newsletter Card */}
-        <div className="mb-16 p-8 sm:p-10 rounded-[32px] bg-gradient-to-r from-[#5C1D3B] via-[#4A0E35] to-[#3E1028] border border-[#7E253E] shadow-2xl">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
-            <div className="lg:col-span-7 space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#D95F7F]/20 text-[#F8CAD5] text-xs font-bold border border-[#D95F7F]/30">
-                <span>✦</span>
-                <span>Stay Connected with Cluster 05</span>
-              </div>
-              <h3 className="font-serif text-2xl sm:text-4xl font-bold text-white">
-                Subscribe to the Sthree Shakthi Newsletter
-              </h3>
-              <p className="text-xs sm:text-sm text-[#F8CAD5]/80 leading-relaxed">
-                Receive monthly community publications, articles, and stories directly in your inbox.
-              </p>
-            </div>
-
-            <div className="lg:col-span-5">
-              {subscribed ? (
-                <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span>You're subscribed! You'll receive all upcoming community editions.</span>
-                </div>
-              ) : (
-                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="email"
-                    required
-                    placeholder="Enter your email address..."
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="px-4 py-3 rounded-full bg-white/10 border border-white/20 text-white placeholder-rose-200/50 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#D95F7F] flex-grow"
-                  />
-                  <button
-                    type="submit"
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white text-xs sm:text-sm font-bold shadow-lg shrink-0 transition-all"
-                  >
-                    <span>Subscribe</span>
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
-                </form>
-              )}
-            </div>
-
-          </div>
-        </div>
 
         {/* Main Footer Columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-[#5C1D3B]/80">

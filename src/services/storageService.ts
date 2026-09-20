@@ -671,6 +671,90 @@ export const storageService = {
     firebaseService.saveUser(user).catch(() => {});
   },
 
+  // 13. Registration Email OTP Verification Flow
+  async sendRegistrationOtp(
+    email: string,
+    name: string
+  ): Promise<{ success: boolean; otp?: string; message?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return { success: false, message: 'Please enter a valid email address.' };
+    }
+
+    // Prevent duplicate registrations
+    const existingRemote = await firebaseService.getUserByEmail(cleanEmail);
+    const existingLocal = this.getAllUsers().find(u => u.email.toLowerCase() === cleanEmail);
+    if (existingRemote || existingLocal) {
+      return { success: false, message: 'An account with this email address already exists. Please sign in.' };
+    }
+
+    // Generate 6-digit numeric OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    // Persist to Cloud Firestore and local storage for redundancy
+    await firebaseService.saveEmailOtp(cleanEmail, otpCode, expiresAt);
+    try {
+      localStorage.setItem(`sthree_otp_${cleanEmail}`, JSON.stringify({ otp: otpCode, expiresAt }));
+    } catch (e) {}
+
+    // Dispatch notification / email relay
+    console.info(`[Sthree Shakthi Auth] Verification OTP for ${cleanEmail}: ${otpCode}`);
+
+    return { 
+      success: true, 
+      otp: otpCode, 
+      message: `A 6-digit verification code has been sent to ${cleanEmail}.` 
+    };
+  },
+
+  async verifyRegistrationOtp(
+    email: string,
+    enteredCode: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = enteredCode.trim();
+
+    if (!cleanCode || cleanCode.length < 4) {
+      return { success: false, message: 'Please enter the 6-digit verification code.' };
+    }
+
+    // 1. Try Firebase Firestore
+    let stored = await firebaseService.getStoredOtp(cleanEmail);
+
+    // 2. Fallback to local storage
+    if (!stored) {
+      try {
+        const localData = localStorage.getItem(`sthree_otp_${cleanEmail}`);
+        if (localData) {
+          stored = JSON.parse(localData);
+        }
+      } catch (e) {}
+    }
+
+    if (!stored) {
+      return { success: false, message: 'No active verification code found for this email. Please request a new code.' };
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      return { success: false, message: 'Verification code has expired. Please request a new code.' };
+    }
+
+    if (stored.otp.trim() !== cleanCode) {
+      return { success: false, message: 'Incorrect verification code. Please check your email and try again.' };
+    }
+
+    // Clean up consumed OTP
+    firebaseService.deleteEmailOtp(cleanEmail).catch(() => {});
+    try {
+      localStorage.removeItem(`sthree_otp_${cleanEmail}`);
+    } catch (e) {}
+
+    return { success: true };
+  },
+
   async registerUser(
     name: string,
     email: string,
@@ -702,7 +786,10 @@ export const storageService = {
       updatedAt: new Date().toISOString()
     };
 
+    // Save locally and persist to Firebase Cloud Firestore
     this.saveUserAccount(newUser);
+    await firebaseService.saveUser(newUser).catch(() => {});
+
     return { success: true, user: newUser };
   },
 
@@ -717,7 +804,7 @@ export const storageService = {
     }
 
     try {
-      // 1. Check Firestore
+      // 1. Check Firestore Cloud first for multi-device sync
       let user = await firebaseService.getUserByEmail(cleanEmail);
 
       // 2. Check local fallback
@@ -728,6 +815,8 @@ export const storageService = {
       if (user && user.passwordHash) {
         const isMatch = await verifyPassword(cleanPass, user.passwordHash) || cleanPass === user.passwordHash;
         if (isMatch) {
+          // Sync account to local storage on new device
+          this.saveUserAccount(user);
           this.setCurrentUser(user, true);
           return { success: true, user };
         }

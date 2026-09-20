@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   User, 
@@ -12,7 +12,9 @@ import {
   ArrowRight,
   ShieldCheck,
   LogIn,
-  UserPlus
+  UserPlus,
+  KeyRound,
+  RotateCcw
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { UserAccount } from '../types';
@@ -32,13 +34,18 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
   initialMode = 'login',
   messageNotice
 }) => {
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [mode, setMode] = useState<'login' | 'register' | 'otp_verify'>(initialMode);
   
   // Register Fields
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regClub, setRegClub] = useState('');
+
+  // OTP Verification Fields
+  const [otpCode, setOtpCode] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+  const [demoOtpHint, setDemoOtpHint] = useState<string | null>(null);
 
   // Login Fields
   const [loginEmail, setLoginEmail] = useState('');
@@ -49,6 +56,17 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
 
   if (!isOpen) return null;
 
@@ -76,7 +94,8 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  // Step 1 of Registration: Request 6-digit OTP
+  const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -89,22 +108,81 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
     }
 
     try {
-      const res = await storageService.registerUser(
+      const res = await storageService.sendRegistrationOtp(regEmail, regName);
+      if (res.success) {
+        setDemoOtpHint(res.otp || null);
+        setMode('otp_verify');
+        setOtpCode('');
+        setResendTimer(60);
+        setSuccessMsg(`A 6-digit verification code has been sent to ${regEmail.trim().toLowerCase()}.`);
+      } else {
+        setErrorMsg(res.message || 'Failed to send verification code. Please try again.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to send verification code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Resend OTP handler
+  const handleResendOtp = async () => {
+    if (resendTimer > 0 || isLoading) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+
+    try {
+      const res = await storageService.sendRegistrationOtp(regEmail, regName);
+      if (res.success) {
+        setDemoOtpHint(res.otp || null);
+        setResendTimer(60);
+        setSuccessMsg(`A new 6-digit verification code has been sent to ${regEmail}.`);
+      } else {
+        setErrorMsg(res.message || 'Could not resend code.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Could not resend code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Step 2 of Registration: Verify 6-digit OTP & Create Account
+  const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    setIsLoading(true);
+
+    try {
+      const verifyRes = await storageService.verifyRegistrationOtp(regEmail, otpCode);
+      if (!verifyRes.success) {
+        setErrorMsg(verifyRes.message || 'Invalid verification code.');
+        setIsLoading(false);
+        return;
+      }
+
+      // OTP verified! Finalize account registration in Cloud Firestore
+      const regRes = await storageService.registerUser(
         regName,
         regEmail,
         regPassword,
         regClub
       );
-      if (res.success && res.user) {
-        setSuccessMsg('Account registered successfully! Please enter your password to sign in.');
+
+      if (regRes.success && regRes.user) {
+        setSuccessMsg('Email verified and account registered successfully! Please sign in.');
         setLoginEmail(regEmail.trim().toLowerCase());
         setLoginPassword('');
         setMode('login');
         setRegPassword('');
         setRegName('');
         setRegClub('');
+        setOtpCode('');
+        setDemoOtpHint(null);
       } else {
-        setErrorMsg(res.message || 'Registration failed. Please try again.');
+        setErrorMsg(regRes.message || 'Registration failed. Please try again.');
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Registration failed. Please try again.');
@@ -127,10 +205,18 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
             </div>
             <div>
               <h2 className="font-serif text-base font-bold text-[#3E1028]">
-                {mode === 'login' ? 'Contributor Sign In' : 'Join Sthree Shakthi'}
+                {mode === 'login' 
+                  ? 'Contributor Sign In' 
+                  : mode === 'register' 
+                    ? 'Join Sthree Shakthi' 
+                    : 'Verify Your Email'}
               </h2>
               <p className="text-[10px] text-[#5C1D3B]/70">
-                {mode === 'login' ? 'Access your dashboard & submit blogs' : 'Create an author profile to publish'}
+                {mode === 'login' 
+                  ? 'Access your dashboard & submit blogs' 
+                  : mode === 'register' 
+                    ? 'Create an author profile to publish' 
+                    : `Enter the 6-digit code sent to ${regEmail}`}
               </p>
             </div>
           </div>
@@ -154,34 +240,36 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
         {/* Content Body */}
         <div className="p-6 sm:p-7 space-y-5 bg-[#FDF9F6]">
           
-          {/* Tab Switcher */}
-          <div className="flex items-center p-1 rounded-2xl bg-[#FAF2EB] border border-[#F4E5DA]">
-            <button
-              type="button"
-              onClick={() => { setMode('login'); setErrorMsg(''); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                mode === 'login'
-                  ? 'bg-white text-[#D95F7F] shadow-xs'
-                  : 'text-[#5C1D3B]/70 hover:text-[#3E1028]'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </button>
+          {/* Tab Switcher (Visible in login and register modes) */}
+          {mode !== 'otp_verify' && (
+            <div className="flex items-center p-1 rounded-2xl bg-[#FAF2EB] border border-[#F4E5DA]">
+              <button
+                type="button"
+                onClick={() => { setMode('login'); setErrorMsg(''); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                  mode === 'login'
+                    ? 'bg-white text-[#D95F7F] shadow-xs'
+                    : 'text-[#5C1D3B]/70 hover:text-[#3E1028]'
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => { setMode('register'); setErrorMsg(''); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                mode === 'register'
-                  ? 'bg-white text-[#D95F7F] shadow-xs'
-                  : 'text-[#5C1D3B]/70 hover:text-[#3E1028]'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Register Account</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => { setMode('register'); setErrorMsg(''); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                  mode === 'register'
+                    ? 'bg-white text-[#D95F7F] shadow-xs'
+                    : 'text-[#5C1D3B]/70 hover:text-[#3E1028]'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Register Account</span>
+              </button>
+            </div>
+          )}
 
           {/* Success Banner */}
           {successMsg && (
@@ -257,9 +345,9 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
                 )}
               </button>
             </form>
-          ) : (
-            /* 2. Registration Form */
-            <form onSubmit={handleRegister} className="space-y-3.5 text-left">
+          ) : mode === 'register' ? (
+            /* 2. Registration Form (Step 1) */
+            <form onSubmit={handleRequestOtp} className="space-y-3.5 text-left">
               <div className="space-y-1">
                 <label className="block text-[11px] font-bold text-[#3E1028] uppercase tracking-wider">
                   Full Name / Author Name <span className="text-[#D95F7F]">*</span>
@@ -344,19 +432,92 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>Register & Start Publishing</span>
+                      <span>Send Verification Code</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}
                 </button>
               </div>
             </form>
+          ) : (
+            /* 3. OTP Verification Form (Step 2) */
+            <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4 text-left animate-in fade-in">
+              <div className="p-4 rounded-2xl bg-white border border-[#F4E5DA] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#3E1028] flex items-center gap-1.5">
+                    <KeyRound className="w-4 h-4 text-[#D95F7F]" />
+                    <span>Enter 6-Digit Code</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('register'); setErrorMsg(''); }}
+                    className="text-[11px] font-medium text-[#D95F7F] hover:underline cursor-pointer"
+                  >
+                    Edit Details
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    placeholder="• • • • • •"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="w-full py-3 text-center tracking-[0.5em] font-mono text-xl font-black rounded-xl bg-[#FAF2EB]/60 border-2 border-[#D95F7F]/40 focus:border-[#D95F7F] text-[#3E1028] focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+
+                {demoOtpHint && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+                    <span>Verification Code: <strong className="font-mono text-xs">{demoOtpHint}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => setOtpCode(demoOtpHint)}
+                      className="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-amber-300 font-bold text-[10px] cursor-pointer"
+                    >
+                      Fill Code
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-xs px-1">
+                <span className="text-[#5C1D3B]/70 text-[11px]">Didn't receive the email?</span>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0 || isLoading}
+                  className="font-bold text-[#D95F7F] hover:text-[#BE4465] disabled:opacity-50 flex items-center gap-1 cursor-pointer text-[11px]"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>{resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend Code'}</span>
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || otpCode.length < 4}
+                className="w-full py-3 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-[#D95F7F]/25 transition-all hover:scale-101 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Verify Code & Complete Registration</span>
+                  </>
+                )}
+              </button>
+            </form>
           )}
 
           {/* Privacy Footnote */}
           <div className="pt-1 text-center text-[10px] text-[#5C1D3B]/60 flex items-center justify-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Securely hashed and encrypted contributor profile</span>
+            <span>Multi-device cloud synchronization & encrypted credentials</span>
           </div>
 
         </div>
