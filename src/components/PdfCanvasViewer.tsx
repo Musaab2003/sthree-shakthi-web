@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -18,7 +18,39 @@ export const PdfCanvasViewer: React.FC<PdfCanvasViewerProps> = ({ dataUrlOrBlob,
   const [numPages, setNumPages] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(600);
   const [scale, setScale] = useState<number>(1.0);
+
+  // ResizeObserver to automatically scale canvas when device is rotated or window is resized
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    updateWidth();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        updateWidth();
+      });
+      ro.observe(container);
+    }
+
+    window.addEventListener('resize', updateWidth);
+    window.addEventListener('orientationchange', updateWidth);
+
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', updateWidth);
+      window.removeEventListener('orientationchange', updateWidth);
+    };
+  }, []);
 
   // 1. Load PDF Document
   useEffect(() => {
@@ -81,10 +113,9 @@ export const PdfCanvasViewer: React.FC<PdfCanvasViewerProps> = ({ dataUrlOrBlob,
         const page = await pdfDoc.getPage(currentPage);
         if (isCancelled) return;
 
-        const container = containerRef.current;
-        const containerWidth = container ? container.clientWidth - 24 : 600;
+        const effectiveWidth = Math.max(280, containerWidth - 32);
         const unscaledViewport = page.getViewport({ scale: 1 });
-        const autoFitScale = Math.min((containerWidth / unscaledViewport.width), 1.6) * scale;
+        const autoFitScale = Math.min((effectiveWidth / unscaledViewport.width), 1.6) * scale;
         const viewport = page.getViewport({ scale: autoFitScale });
 
         const canvas = canvasRef.current;
@@ -126,7 +157,7 @@ export const PdfCanvasViewer: React.FC<PdfCanvasViewerProps> = ({ dataUrlOrBlob,
         } catch {}
       }
     };
-  }, [pdfDoc, currentPage, scale]);
+  }, [pdfDoc, currentPage, scale, containerWidth]);
 
   const handlePrevPage = () => {
     setCurrentPage(p => Math.max(1, p - 1));

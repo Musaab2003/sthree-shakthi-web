@@ -114,9 +114,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [subscribers, setSubscribers] = useState<string[]>([]);
   const [subscriberSearch, setSubscriberSearch] = useState('');
   const [newSubscriberInput, setNewSubscriberInput] = useState('');
+  const getLivePlatformUrl = () => {
+    if (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')) {
+      return window.location.origin;
+    }
+    return 'https://sthree-shakthi-web.vercel.app';
+  };
+
   const [broadcastSubject, setBroadcastSubject] = useState('✨ New Publication Release | Project Sthree Shakthi');
-  const [broadcastMessage, setBroadcastMessage] = useState(
-    `Hello Sthree Shakthi Community Member,\n\nA new edition has just been published on the Project Sthree Shakthi digital platform by Cluster 05, Rotaract District 3220!\n\n👉 Visit the live platform to view and read the latest publication:\nhttps://localhost:9999/#publications\n\nWarm regards,\nCluster 05 Editorial Board\nRotaract District 3220`
+  const [broadcastMessage, setBroadcastMessage] = useState(() =>
+    `Hello Sthree Shakthi Community Member,\n\nA new edition has just been published on the Project Sthree Shakthi digital platform by Cluster 05, Rotaract District 3220!\n\n👉 Visit the live platform to view and read the latest publication:\n${typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost') ? window.location.origin : 'https://sthree-shakthi-web.vercel.app'}/#publications\n\nWarm regards,\nCluster 05 Editorial Board\nRotaract District 3220`
   );
   const [copiedEmailsToast, setCopiedEmailsToast] = useState(false);
   const [copiedBroadcastToast, setCopiedBroadcastToast] = useState(false);
@@ -283,20 +290,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   };
 
   const handleApplyTemplate = (type: 'publication' | 'digest' | 'workshop') => {
+    const liveUrl = getLivePlatformUrl();
     if (type === 'publication') {
       setBroadcastSubject('✨ New Publication Live on Project Sthree Shakthi | Cluster 05');
       setBroadcastMessage(
-        `Dear Sthree Shakthi Subscriber,\n\nWe are delighted to share that a new edition has just been published on our community platform by Cluster 05, Rotaract District 3220!\n\n📖 Read the latest articles, stories, and magazines online:\nhttps://localhost:9999/#publications\n\nThank you for supporting women empowerment across Sri Lanka!\n\nWarm regards,\nCluster 05 Editorial Team`
+        `Dear Sthree Shakthi Subscriber,\n\nWe are delighted to share that a new edition has just been published on our community platform by Cluster 05, Rotaract District 3220!\n\n📖 Read the latest articles, stories, and magazines online:\n${liveUrl}/#publications\n\nThank you for supporting women empowerment across Sri Lanka!\n\nWarm regards,\nCluster 05 Editorial Team`
       );
     } else if (type === 'digest') {
       setBroadcastSubject('🌸 Sthree Shakthi Monthly Newsletter | Rotaract District 3220');
       setBroadcastMessage(
-        `Dear Community Members & Rotaractors,\n\nHere is your monthly digest of Project Sthree Shakthi:\n\n✨ 10 Clubs United across Cluster 05\n✨ New leadership pathways and empowerment stories published\n✨ Community magazines & PDF toolkits available online\n\n👉 Access all resources here: https://localhost:9999/\n\nTogether Sri Lanka ✦ District 3220`
+        `Dear Community Members & Rotaractors,\n\nHere is your monthly digest of Project Sthree Shakthi:\n\n✨ 10 Clubs United across Cluster 05\n✨ New leadership pathways and empowerment stories published\n✨ Community magazines & PDF toolkits available online\n\n👉 Access all resources here: ${liveUrl}/\n\nTogether Sri Lanka ✦ District 3220`
       );
     } else if (type === 'workshop') {
       setBroadcastSubject('📢 Invitation: Upcoming Sthree Shakthi Leadership & Career Workshop');
       setBroadcastMessage(
-        `Hello,\n\nYou are cordially invited to our upcoming Sthree Shakthi Empowerment Workshop hosted by Cluster 05, Rotaract District 3220.\n\n📅 Date & Time: [Enter Date & Time]\n📍 Platform / Venue: [Enter Online / In-Person Details]\n🎯 Topics: Career Leadership, Financial Confidence & Creative Enterprise\n\n👉 Register and view details on our website: https://localhost:9999/\n\nSee you there!`
+        `Hello,\n\nYou are cordially invited to our upcoming Sthree Shakthi Empowerment Workshop hosted by Cluster 05, Rotaract District 3220.\n\n📅 Date & Time: [Enter Date & Time]\n📍 Platform / Venue: [Enter Online / In-Person Details]\n🎯 Topics: Career Leadership, Financial Confidence & Creative Enterprise\n\n👉 Register and view details on our website: ${liveUrl}/\n\nSee you there!`
       );
     }
   };

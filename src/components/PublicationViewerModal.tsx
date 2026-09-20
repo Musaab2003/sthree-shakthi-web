@@ -26,6 +26,9 @@ interface PublicationViewerModalProps {
 
 function safeBase64ToBlobUrl(rawData: string): string | null {
   try {
+    if (rawData.startsWith('http://') || rawData.startsWith('https://') || rawData.startsWith('blob:')) {
+      return rawData;
+    }
     const parts = rawData.split(',');
     const mimeMatch = parts[0]?.match(/:(.*?);/);
     const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
@@ -60,6 +63,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const [hasLiked, setHasLiked] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const lastLoadedPubIdRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     setLikesCount(publication?.likes || 0);
@@ -68,25 +72,32 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
     if (publication) {
       document.body.style.overflow = 'hidden';
-      if (publication.fileData && publication.fileData.length > 50) {
-        setLoadedFileData(publication.fileData);
-        setIsLoadingFile(false);
-      } else {
-        setIsLoadingFile(true);
-        setLoadedFileData(null);
-        setBlobUrl(null);
-        storageService.getPublicationFileData(publication.id).then((data) => {
-          if (data) {
-            setLoadedFileData(data);
-          }
+
+      // Only re-fetch and reset file data if the publication ID has changed
+      if (lastLoadedPubIdRef.current !== publication.id) {
+        lastLoadedPubIdRef.current = publication.id;
+
+        if (publication.fileData && publication.fileData.length > 50) {
+          setLoadedFileData(publication.fileData);
           setIsLoadingFile(false);
-        }).catch((err) => {
-          console.warn('Error fetching publication file data:', err);
-          setIsLoadingFile(false);
-        });
+        } else {
+          setIsLoadingFile(true);
+          setLoadedFileData(null);
+          setBlobUrl(null);
+          storageService.getPublicationFileData(publication.id).then((data) => {
+            if (data) {
+              setLoadedFileData(data);
+            }
+            setIsLoadingFile(false);
+          }).catch((err) => {
+            console.warn('Error fetching publication file data:', err);
+            setIsLoadingFile(false);
+          });
+        }
       }
     } else {
       document.body.style.overflow = 'unset';
+      lastLoadedPubIdRef.current = null;
       setIsLoadingFile(false);
       setLoadedFileData(null);
       setBlobUrl(null);
@@ -110,7 +121,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
     let activeBlobUrl: string | null = null;
     const rawData = loadedFileData || publication.fileData;
 
-    if (rawData && (rawData.startsWith('data:') || rawData.length > 100)) {
+    if (rawData && (rawData.startsWith('data:') || rawData.startsWith('http://') || rawData.startsWith('https://') || rawData.startsWith('blob:') || rawData.length > 100)) {
       const converted = safeBase64ToBlobUrl(rawData);
       if (converted) {
         activeBlobUrl = converted;
@@ -137,7 +148,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
         URL.revokeObjectURL(activeBlobUrl);
       }
     };
-  }, [loadedFileData, publication, isLoadingFile]);
+  }, [loadedFileData, publication?.id, publication?.fileData, publication?.embedUrl, isLoadingFile]);
 
   if (!publication) return null;
 
