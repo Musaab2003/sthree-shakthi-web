@@ -61,29 +61,34 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoadedFileData(publication?.fileData || null);
     setLikesCount(publication?.likes || 0);
     setHasLiked(publication ? storageService.hasUserLiked(publication.id) : false);
     setCopiedToast(false);
 
     if (publication) {
       document.body.style.overflow = 'hidden';
-      if (!publication.fileData) {
+      if (publication.fileData && publication.fileData.length > 50) {
+        setLoadedFileData(publication.fileData);
+        setIsLoadingFile(false);
+      } else {
         setIsLoadingFile(true);
+        setLoadedFileData(null);
+        setBlobUrl(null);
         storageService.getPublicationFileData(publication.id).then((data) => {
           if (data) {
             setLoadedFileData(data);
           }
           setIsLoadingFile(false);
-        }).catch(() => {
+        }).catch((err) => {
+          console.warn('Error fetching publication file data:', err);
           setIsLoadingFile(false);
         });
-      } else {
-        setIsLoadingFile(false);
       }
     } else {
       document.body.style.overflow = 'unset';
       setIsLoadingFile(false);
+      setLoadedFileData(null);
+      setBlobUrl(null);
     }
     return () => {
       document.body.style.overflow = 'unset';
@@ -93,6 +98,11 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   useEffect(() => {
     if (!publication) {
       setBlobUrl(null);
+      return;
+    }
+
+    // Do not generate fallback if still loading from database
+    if (isLoadingFile) {
       return;
     }
 
@@ -111,7 +121,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       const parsed = parseDocumentOrFlipbookUrl(publication.embedUrl);
       setBlobUrl(parsed.embedUrl || publication.embedUrl);
     } else {
-      // Generate a genuine client-side PDF document so the viewer ALWAYS shows a real PDF document
+      // If truly no file was attached, create fallback PDF document
       try {
         const fallbackBlob = generatePublicationPdfBlob(publication);
         activeBlobUrl = URL.createObjectURL(fallbackBlob);
@@ -126,7 +136,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
         URL.revokeObjectURL(activeBlobUrl);
       }
     };
-  }, [loadedFileData, publication]);
+  }, [loadedFileData, publication, isLoadingFile]);
 
   if (!publication) return null;
 
