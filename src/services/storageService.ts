@@ -1,12 +1,15 @@
-import { Publication, PublicationStatus, DatabaseConfig, AdminAccount } from '../types';
+import { Publication, PublicationStatus, DatabaseConfig, AdminAccount, UserAccount } from '../types';
 import { INITIAL_PUBLICATIONS } from '../data/initialPublications';
 import { firebaseService, DEFAULT_FIREBASE_CONFIG } from './firebaseService';
+import { hashPassword, verifyPassword } from '../utils/crypto';
 
 const STORAGE_KEY = 'sthree_shakthi_publications_v3';
 const DB_CONFIG_KEY = 'sthree_shakthi_db_config_v2';
 const SUBSCRIBERS_KEY = 'sthree_shakthi_subscribers_v1';
 const ADMIN_ACCOUNT_KEY = 'sthree_shakthi_admin_account_v1';
 const USER_LIKES_KEY = 'sthree_shakthi_user_likes_v1';
+const USER_SESSION_KEY = 'sthree_shakthi_current_user_v1';
+const ALL_USERS_KEY = 'sthree_shakthi_all_users_v1';
 
 const DEFAULT_ADMIN: AdminAccount = {
   username: 'admin',
@@ -565,8 +568,132 @@ export const storageService = {
     firebaseService.deleteAdmin(username).catch(() => {});
   },
 
-  // 17. Multi-Device Cloud Synchronizer
-  async syncFromCloud(): Promise<{ publications: Publication[]; subscribers: string[]; admins: AdminAccount[] }> {
+  // 17. Contributor User Authentication & Account Management
+  getCurrentUser(): UserAccount | null {
+    try {
+      const data = sessionStorage.getItem(USER_SESSION_KEY) || localStorage.getItem(USER_SESSION_KEY);
+      if (data) return JSON.parse(data);
+    } catch {}
+    return null;
+  },
+
+  setCurrentUser(user: UserAccount | null, remember: boolean = true): void {
+    try {
+      if (user) {
+        sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
+        if (remember) {
+          localStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
+        }
+      } else {
+        sessionStorage.removeItem(USER_SESSION_KEY);
+        localStorage.removeItem(USER_SESSION_KEY);
+      }
+    } catch {}
+  },
+
+  logoutUser(): void {
+    this.setCurrentUser(null);
+  },
+
+  getAllUsers(): UserAccount[] {
+    try {
+      const data = localStorage.getItem(ALL_USERS_KEY);
+      if (data) return JSON.parse(data);
+    } catch {}
+    return [];
+  },
+
+  saveUserAccount(user: UserAccount): void {
+    let all = this.getAllUsers();
+    const cleanEmail = user.email.trim().toLowerCase();
+    const idx = all.findIndex(u => u.email.toLowerCase() === cleanEmail);
+    if (idx !== -1) {
+      all[idx] = user;
+    } else {
+      all.push(user);
+    }
+    localStorage.setItem(ALL_USERS_KEY, JSON.stringify(all));
+    firebaseService.saveUser(user).catch(() => {});
+  },
+
+  async registerUser(
+    name: string,
+    email: string,
+    password: string,
+    club?: string
+  ): Promise<{ success: boolean; user?: UserAccount; message?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    if (!cleanEmail || !cleanName || !password.trim()) {
+      return { success: false, message: 'Please provide full name, valid email, and password.' };
+    }
+
+    // Check if user already exists in Firestore or locally
+    const existingRemote = await firebaseService.getUserByEmail(cleanEmail);
+    const existingLocal = this.getAllUsers().find(u => u.email.toLowerCase() === cleanEmail);
+    if (existingRemote || existingLocal) {
+      return { success: false, message: 'An account with this email address already exists. Please log in.' };
+    }
+
+    const hashed = await hashPassword(password.trim());
+    const newUser: UserAccount = {
+      id: `usr-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name: cleanName,
+      email: cleanEmail,
+      passwordHash: hashed,
+      club: club?.trim() || undefined,
+      role: 'contributor',
+      registeredAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    this.saveUserAccount(newUser);
+    this.setCurrentUser(newUser, true);
+    return { success: true, user: newUser };
+  },
+
+  async loginUser(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; user?: UserAccount; message?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = password.trim();
+    if (!cleanEmail || !cleanPass) {
+      return { success: false, message: 'Please enter both email and password.' };
+    }
+
+    try {
+      // 1. Check Firestore
+      let user = await firebaseService.getUserByEmail(cleanEmail);
+
+      // 2. Check local fallback
+      if (!user) {
+        user = this.getAllUsers().find(u => u.email.toLowerCase() === cleanEmail) || null;
+      }
+
+      if (user && user.passwordHash) {
+        const isMatch = await verifyPassword(cleanPass, user.passwordHash) || cleanPass === user.passwordHash;
+        if (isMatch) {
+          this.setCurrentUser(user, true);
+          return { success: true, user };
+        }
+      }
+
+      return { success: false, message: 'Invalid email or password. Please check your credentials.' };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Login failed. Please try again.' };
+    }
+  },
+
+  // Get all submissions by a specific contributor (for their personal dashboard)
+  getUserPublications(userEmail: string): Publication[] {
+    const cleanEmail = userEmail.trim().toLowerCase();
+    const all = this.getAllPublications();
+    return all.filter(p => (p.authorEmail || '').trim().toLowerCase() === cleanEmail);
+  },
+
+  // 18. Multi-Device Cloud Synchronizer
+  async syncFromCloud(): Promise<{ publications: Publication[]; subscribers: string[]; admins: AdminAccount[]; users: UserAccount[] }> {
     try {
       // 1. Sync remote publications from Firebase Cloud Firestore
       const remotePubs = await firebaseService.syncAllPublications();
@@ -612,10 +739,20 @@ export const storageService = {
         firebaseService.saveAdmin(def).catch(() => {});
       }
 
-      return { publications: currentPubs, subscribers: currentSubs, admins: currentAdmins };
+      // 4. Sync remote users from Firebase Cloud Firestore
+      const remoteUsers = await firebaseService.getUsers();
+      let currentUsers = this.getAllUsers();
+      if (remoteUsers.length > 0) {
+        const userMap = new Map<string, UserAccount>();
+        remoteUsers.forEach(u => userMap.set(u.email.toLowerCase(), u));
+        currentUsers = Array.from(userMap.values());
+        localStorage.setItem(ALL_USERS_KEY, JSON.stringify(currentUsers));
+      }
+
+      return { publications: currentPubs, subscribers: currentSubs, admins: currentAdmins, users: currentUsers };
     } catch (err) {
       console.warn('Cloud sync background note:', err);
-      return { publications: this.getAllPublications(), subscribers: this.getSubscribers(), admins: this.getAllAdmins() };
+      return { publications: this.getAllPublications(), subscribers: this.getSubscribers(), admins: this.getAllAdmins(), users: this.getAllUsers() };
     }
   }
 };

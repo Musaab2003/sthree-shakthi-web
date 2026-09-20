@@ -9,8 +9,10 @@ import { PublicationViewerModal } from './components/PublicationViewerModal';
 import { SubmitPublicationModal } from './components/SubmitPublicationModal';
 import { AdminPortal } from './components/AdminPortal';
 import { DatabaseSettingsModal } from './components/DatabaseSettingsModal';
+import { UserAuthModal } from './components/UserAuthModal';
+import { ContributorDashboard } from './components/ContributorDashboard';
 
-import { Publication, DatabaseConfig } from './types';
+import { Publication, DatabaseConfig, UserAccount } from './types';
 import { storageService } from './services/storageService';
 import { firebaseService } from './services/firebaseService';
 
@@ -18,6 +20,12 @@ export function App() {
   const [allPublications, setAllPublications] = useState<Publication[]>([]);
   const [activeSection, setActiveSection] = useState<string>('hero');
   
+  // Contributor / User State
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => storageService.getCurrentUser());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalNotice, setAuthModalNotice] = useState('');
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+
   // Modals state
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isAdminPortalOpen, setIsAdminPortalOpen] = useState(false);
@@ -96,6 +104,30 @@ export function App() {
   const approvedPublications = allPublications.filter(p => p.status === 'approved');
 
   // Handlers
+  const handleOpenSubmitModal = () => {
+    if (!currentUser) {
+      setAuthModalNotice('Please sign in or register an author account to submit a publication/blog.');
+      setIsAuthModalOpen(true);
+    } else {
+      setIsSubmitModalOpen(true);
+    }
+  };
+
+  const handleUserAuthSuccess = (user: UserAccount) => {
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+    if (authModalNotice) {
+      setAuthModalNotice('');
+      setIsSubmitModalOpen(true);
+    }
+  };
+
+  const handleUserLogout = () => {
+    storageService.logoutUser();
+    setCurrentUser(null);
+    setIsDashboardOpen(false);
+  };
+
   const handleOpenViewer = (pub: Publication) => {
     storageService.recordView(pub.id);
     const updated = storageService.getAllPublications();
@@ -179,15 +211,18 @@ export function App() {
     <div className="min-h-screen flex flex-col selection:bg-[#D95F7F] selection:text-white bg-[#FDF9F6]">
       {/* Navigation Header */}
       <Navbar
-        onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+        onOpenSubmitModal={handleOpenSubmitModal}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
+        currentUser={currentUser}
+        onOpenAuthModal={() => { setAuthModalNotice(''); setIsAuthModalOpen(true); }}
+        onOpenDashboard={() => setIsDashboardOpen(true)}
       />
 
       {/* Main Content Sections */}
       <main className="flex-grow">
         <Hero
-          onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+          onOpenSubmitModal={handleOpenSubmitModal}
           onExplorePublications={() => scrollToSection('publications')}
           onExploreAbout={() => scrollToSection('about')}
         />
@@ -202,14 +237,14 @@ export function App() {
         <PublicationsFeed
           publications={approvedPublications}
           onOpenViewer={handleOpenViewer}
-          onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+          onOpenSubmitModal={handleOpenSubmitModal}
           onLike={handleLike}
         />
       </main>
 
       {/* Footer */}
       <Footer
-        onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+        onOpenSubmitModal={handleOpenSubmitModal}
         onOpenAdminPortal={() => setIsAdminPortalOpen(true)}
         setActiveSection={setActiveSection}
       />
@@ -227,6 +262,27 @@ export function App() {
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleSubmitPublication}
+        currentUser={currentUser}
+      />
+
+      {/* Contributor Dashboard Modal (Personal Submissions & Rejection Feedback) */}
+      <ContributorDashboard
+        isOpen={isDashboardOpen}
+        onClose={() => setIsDashboardOpen(false)}
+        currentUser={currentUser}
+        publications={allPublications}
+        onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
+        onOpenViewer={handleOpenViewer}
+        onLogout={handleUserLogout}
+        onDeleteSubmission={handleDelete}
+      />
+
+      {/* Contributor Auth Modal (Register & Login) */}
+      <UserAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => { setIsAuthModalOpen(false); setAuthModalNotice(''); }}
+        onSuccess={handleUserAuthSuccess}
+        messageNotice={authModalNotice}
       />
 
       {/* Admin Moderation Portal (Hidden / Protected) */}

@@ -2,19 +2,29 @@ import React, { useState } from 'react';
 import { 
   PlusCircle, 
   Menu, 
-  X
+  X,
+  User,
+  LayoutDashboard,
+  LogIn
 } from 'lucide-react';
+import { UserAccount } from '../types';
 
 interface NavbarProps {
   onOpenSubmitModal: () => void;
   activeSection: string;
   setActiveSection: (section: string) => void;
+  currentUser?: UserAccount | null;
+  onOpenAuthModal: () => void;
+  onOpenDashboard: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenSubmitModal,
   activeSection,
   setActiveSection,
+  currentUser,
+  onOpenAuthModal,
+  onOpenDashboard,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -62,12 +72,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Clean Divider */}
             <div className="hidden lg:block h-10 w-[1.5px] bg-[#D95F7F]/30 mx-1" />
 
-            {/* Partner Logo 1: Together Sri Lanka (Refined medium size) */}
+            {/* Partner Logo 1: Together Sri Lanka */}
             <div className="hidden lg:flex items-center h-11 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" title="Together Sri Lanka">
               <img src="/together-sl-logo.png" alt="Together Sri Lanka Logo" className="h-full w-auto object-contain" />
             </div>
 
-            {/* Partner Logo 2: Rotaract (Enlarged size) */}
+            {/* Partner Logo 2: Rotaract */}
             <div className="hidden lg:flex items-center h-8 sm:h-9 shrink-0 group-hover:scale-105 transition-transform" title="Rotaract District 3220">
               <img src="/rotaract-logo.png" alt="Rotaract Logo" className="h-full w-auto object-contain" />
             </div>
@@ -81,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={link.id}
                   onClick={() => handleNavClick(link.id)}
-                  className={`text-sm font-medium transition-colors tracking-wide ${
+                  className={`text-sm font-medium transition-colors tracking-wide cursor-pointer ${
                     isActive
                       ? 'text-[#D95F7F] font-bold border-b-2 border-[#D95F7F] pb-0.5'
                       : 'text-[#5C1D3B]/80 hover:text-[#D95F7F]'
@@ -93,11 +103,37 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </nav>
 
-          {/* Action CTA: Clean Submit Blog Button */}
+          {/* Action CTAs: Submit Blog + User Profile / Login */}
           <div className="hidden md:flex items-center gap-3">
+            {currentUser ? (
+              <button
+                type="button"
+                onClick={onOpenDashboard}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs hover:scale-102 transition-all cursor-pointer"
+                title="Open your contributor dashboard"
+              >
+                <div className="w-6 h-6 rounded-full bg-[#D95F7F] text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                  {currentUser.name.slice(0, 2)}
+                </div>
+                <span className="max-w-[120px] truncate">{currentUser.name.split(' ')[0]}</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-[#D95F7F]/15 text-[#D95F7F] text-[9px] font-extrabold uppercase">
+                  Dashboard
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenAuthModal}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold text-[#5C1D3B] hover:text-[#D95F7F] bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs transition-all cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In / Register</span>
+              </button>
+            )}
+
             <button
               onClick={onOpenSubmitModal}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/25 hover:scale-102 transition-all"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/25 hover:scale-102 transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Submit Blog</span>
@@ -106,9 +142,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Mobile menu trigger */}
           <div className="flex md:hidden items-center gap-2">
+            {currentUser ? (
+              <button
+                onClick={onOpenDashboard}
+                className="w-9 h-9 rounded-full bg-[#D95F7F] text-white flex items-center justify-center text-xs font-bold uppercase shadow-2xs"
+                title="My Dashboard"
+              >
+                {currentUser.name.slice(0, 2)}
+              </button>
+            ) : (
+              <button
+                onClick={onOpenAuthModal}
+                className="p-2 rounded-full bg-white text-[#5C1D3B] border border-[#F4E5DA]"
+                title="Sign In"
+              >
+                <User className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               onClick={onOpenSubmitModal}
               className="p-2 rounded-full bg-[#D95F7F] text-white"
+              title="Submit Blog"
             >
               <PlusCircle className="w-4 h-4" />
             </button>
@@ -124,7 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-[#F4E5DA] bg-[#FDF9F6] px-4 pt-2 pb-6 space-y-3">
+        <div className="md:hidden border-b border-[#F4E5DA] bg-[#FDF9F6] px-4 pt-2 pb-6 space-y-3 animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col gap-2 pt-2">
             {navLinks.map((link) => (
               <button
@@ -137,7 +192,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             ))}
           </div>
 
-          <div className="pt-3 border-t border-[#F4E5DA] flex flex-col gap-3">
+          <div className="pt-3 border-t border-[#F4E5DA] flex flex-col gap-2.5">
+            {currentUser ? (
+              <button
+                onClick={() => { setMobileMenuOpen(false); onOpenDashboard(); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full font-bold text-[#3E1028] bg-white border border-[#F4E5DA] text-xs shadow-2xs"
+              >
+                <LayoutDashboard className="w-4 h-4 text-[#D95F7F]" />
+                <span>My Submissions & Dashboard ({currentUser.name})</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => { setMobileMenuOpen(false); onOpenAuthModal(); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full font-bold text-[#5C1D3B] bg-white border border-[#F4E5DA] text-xs shadow-2xs"
+              >
+                <LogIn className="w-4 h-4 text-[#D95F7F]" />
+                <span>Contributor Sign In / Register</span>
+              </button>
+            )}
+
             <button
               onClick={() => { setMobileMenuOpen(false); onOpenSubmitModal(); }}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full font-bold text-white bg-[#D95F7F] text-xs shadow-md"

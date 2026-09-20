@@ -16,7 +16,7 @@ import {
   Unsubscribe 
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
-import { Publication, PublicationStatus, FirebaseConfig, AdminAccount } from '../types';
+import { Publication, PublicationStatus, FirebaseConfig, AdminAccount, UserAccount } from '../types';
 
 const STORAGE_KEY = 'sthree_shakthi_firebase_config_v1';
 
@@ -163,6 +163,7 @@ export const firebaseService = {
             const data = d.data();
             return {
               id: d.id,
+              authorId: data.authorId || undefined,
               title: data.title || 'Untitled',
               subtitle: data.subtitle || undefined,
               authorName: data.authorName || 'Anonymous',
@@ -176,6 +177,7 @@ export const firebaseService = {
               fileName: data.fileName || undefined,
               fileSize: data.fileSize || undefined,
               fileData: data.fileData || undefined,
+              chunkCount: Number(data.chunkCount) || undefined,
               coverImage: data.coverImage || '/campaign-poster.jpg',
               tags: Array.isArray(data.tags) ? data.tags : [],
               status: (data.status || 'pending') as PublicationStatus,
@@ -211,6 +213,7 @@ export const firebaseService = {
           const data = d.data();
           return {
             id: d.id,
+            authorId: data.authorId || undefined,
             title: data.title || 'Untitled',
             subtitle: data.subtitle || undefined,
             authorName: data.authorName || 'Anonymous',
@@ -224,6 +227,7 @@ export const firebaseService = {
             fileName: data.fileName || undefined,
             fileSize: data.fileSize || undefined,
             fileData: data.fileData || undefined,
+            chunkCount: Number(data.chunkCount) || undefined,
             coverImage: data.coverImage || '/campaign-poster.jpg',
             tags: Array.isArray(data.tags) ? data.tags : [],
             status: (data.status || 'pending') as PublicationStatus,
@@ -250,6 +254,7 @@ export const firebaseService = {
     try {
       const docRef = doc(db, 'publications', pub.id);
       const cleanData: Record<string, any> = {
+        authorId: pub.authorId || null,
         title: pub.title || 'Untitled',
         subtitle: pub.subtitle || null,
         authorName: pub.authorName || 'Anonymous',
@@ -263,6 +268,7 @@ export const firebaseService = {
         fileName: pub.fileName || null,
         fileSize: pub.fileSize || null,
         fileData: (pub.fileData && pub.fileData.length < 500000) ? pub.fileData : null,
+        chunkCount: pub.chunkCount || null,
         coverImage: pub.coverImage || '/campaign-poster.jpg',
         tags: pub.tags || [],
         status: pub.status || 'pending',
@@ -348,11 +354,13 @@ export const firebaseService = {
     try {
       const docRef = doc(db, 'publications', id);
       await deleteDoc(docRef);
-      // Clean up chunk documents
+      // Clean up chunk documents in parallel
+      const chunkDeletions = [];
       for (let i = 0; i < 30; i++) {
         const chunkDocRef = doc(db, 'publications', `chunk-${id}-${String(i).padStart(4, '0')}`);
-        deleteDoc(chunkDocRef).catch(() => {});
+        chunkDeletions.push(deleteDoc(chunkDocRef).catch(() => {}));
       }
+      await Promise.all(chunkDeletions);
       return true;
     } catch (err) {
       console.error('Firebase deletePublication error:', err);
@@ -401,8 +409,12 @@ export const firebaseService = {
 
         batchPromises.push(setDoc(doc(db, 'publications', chunkId), chunkDocData));
       }
+
+      // Also record chunkCount on main document
+      batchPromises.push(updateDoc(doc(db, 'publications', pubId), { chunkCount: totalChunks }).catch(() => {}));
+
       const saveTask = Promise.all(batchPromises).then(() => true);
-      const timeoutTask = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 25000));
+      const timeoutTask = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 12000));
       return await Promise.race([saveTask, timeoutTask]);
     } catch (e) {
       console.warn('Firestore chunk save notice:', e);
@@ -414,22 +426,48 @@ export const firebaseService = {
     const db = this.getDb();
     if (!db || !id) return null;
     try {
-      // 1. Try single doc field if present
+      // 1. Fetch main doc
       const docRef = doc(db, 'publications', id);
       const snap = await getDoc(docRef);
-      if (snap.exists() && snap.data()?.fileData && snap.data()?.fileData.length > 50) {
-        return snap.data()?.fileData;
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data?.fileData && data.fileData.length > 50) {
+          return data.fileData;
+        }
+
+        const count = Number(data?.chunkCount) || 0;
+        if (count > 0) {
+          // Parallel fetch all known chunks simultaneously in 1 network burst
+          const chunkPromises = [];
+          for (let i = 0; i < count; i++) {
+            const chunkId = `chunk-${id}-${String(i).padStart(4, '0')}`;
+            chunkPromises.push(getDoc(doc(db, 'publications', chunkId)));
+          }
+          const chunkSnaps = await Promise.all(chunkPromises);
+          let combined = '';
+          for (const cs of chunkSnaps) {
+            if (cs.exists()) {
+              combined += cs.data()?.fileData || '';
+            }
+          }
+          if (combined.length > 50) {
+            return combined;
+          }
+        }
       }
 
-      // 2. Fetch chunk documents from permitted publications collection
+      // 2. Fallback: Fast parallel batch fetch of first 12 chunks
+      const batchPromises = [];
+      for (let i = 0; i < 12; i++) {
+        const chunkId = `chunk-${id}-${String(i).padStart(4, '0')}`;
+        batchPromises.push(getDoc(doc(db, 'publications', chunkId)));
+      }
+      const chunkSnaps = await Promise.all(batchPromises);
       let combined = '';
-      let chunkIdx = 0;
-      while (chunkIdx < 30) {
-        const chunkId = `chunk-${id}-${String(chunkIdx).padStart(4, '0')}`;
-        const chunkSnap = await getDoc(doc(db, 'publications', chunkId));
-        if (!chunkSnap.exists()) break;
-        combined += chunkSnap.data()?.fileData || '';
-        chunkIdx++;
+      for (const cs of chunkSnaps) {
+        if (cs.exists()) {
+          combined += cs.data()?.fileData || '';
+        }
       }
 
       if (combined && combined.length > 50) {
@@ -572,6 +610,83 @@ export const firebaseService = {
     } catch (err) {
       console.error('Firebase deleteAdmin error:', err);
       return false;
+    }
+  },
+
+  // 5. Contributor User Accounts Collection in Firestore
+  async getUserByEmail(email: string): Promise<UserAccount | null> {
+    const db = this.getDb();
+    if (!db || !email) return null;
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const docId = cleanEmail.replace(/\./g, '___');
+      const docRef = doc(db, 'users', docId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          id: data.id || docId,
+          name: data.name || '',
+          email: cleanEmail,
+          passwordHash: data.passwordHash || '',
+          club: data.club || undefined,
+          role: data.role || 'contributor',
+          registeredAt: data.registeredAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || undefined
+        };
+      }
+      return null;
+    } catch (e) {
+      console.warn('Error fetching user by email from Firestore:', e);
+      return null;
+    }
+  },
+
+  async saveUser(user: UserAccount): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !user.email) return false;
+    try {
+      const cleanEmail = user.email.trim().toLowerCase();
+      const docId = cleanEmail.replace(/\./g, '___');
+      await setDoc(doc(db, 'users', docId), {
+        id: user.id || docId,
+        name: user.name || '',
+        email: cleanEmail,
+        passwordHash: user.passwordHash,
+        club: user.club || null,
+        role: user.role || 'contributor',
+        registeredAt: user.registeredAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return true;
+    } catch (err) {
+      console.error('Firebase saveUser error:', err);
+      return false;
+    }
+  },
+
+  async getUsers(): Promise<UserAccount[]> {
+    const db = this.getDb();
+    if (!db) return [];
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      if (snap.empty) return [];
+      return snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: data.id || d.id,
+          name: data.name || '',
+          email: (data.email || d.id.replace(/___/g, '.')).trim().toLowerCase(),
+          passwordHash: data.passwordHash || '',
+          club: data.club || undefined,
+          role: data.role || 'contributor',
+          registeredAt: data.registeredAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || undefined
+        };
+      });
+    } catch (e) {
+      console.warn('Error fetching users from Firestore:', e);
+      return [];
     }
   }
 };

@@ -10,6 +10,7 @@ export type PublicationCategory =
 
 export interface Publication {
   id: string;
+  authorId?: string;
   title: string;
   subtitle?: string;
   authorName: string;
@@ -23,6 +24,7 @@ export interface Publication {
   fileName?: string;
   fileSize?: string;
   fileData?: string;
+  chunkCount?: number;
   coverImage: string;
   tags: string[];
   status: PublicationStatus;
@@ -74,5 +76,16 @@ export interface AdminAccount {
   email?: string;
   passwordHash: string;
   updatedAt: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  club?: string;
+  role?: 'contributor' | 'admin';
+  registeredAt: string;
+  updatedAt?: string;
 }
 

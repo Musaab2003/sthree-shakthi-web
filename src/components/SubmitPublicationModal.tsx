@@ -8,12 +8,13 @@ import {
   FileType,
   Trash2
 } from 'lucide-react';
-import { Publication, PublicationType } from '../types';
+import { Publication, PublicationType, UserAccount } from '../types';
 
 interface SubmitPublicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (pub: Omit<Publication, 'id' | 'status' | 'submittedAt' | 'views' | 'likes'>, rawFile?: File | null) => Promise<any> | void;
+  currentUser?: UserAccount | null;
 }
 
 const DEFAULT_COVER = '/campaign-poster.jpg';
@@ -22,16 +23,26 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  currentUser,
 }) => {
   const [type, setType] = useState<PublicationType>('pdf');
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
-  const [authorName, setAuthorName] = useState('');
-  const [authorEmail, setAuthorEmail] = useState('');
-  const [authorClub, setAuthorClub] = useState('');
+  const [authorName, setAuthorName] = useState(() => currentUser?.name || '');
+  const [authorEmail, setAuthorEmail] = useState(() => currentUser?.email || '');
+  const [authorClub, setAuthorClub] = useState(() => currentUser?.club || '');
   const [summary, setSummary] = useState('');
   const [embedUrl, setEmbedUrl] = useState('');
   const [content, setContent] = useState('');
+
+  // Update prefill when user changes or modal opens
+  React.useEffect(() => {
+    if (currentUser && isOpen) {
+      if (!authorName) setAuthorName(currentUser.name || '');
+      if (!authorEmail) setAuthorEmail(currentUser.email || '');
+      if (!authorClub) setAuthorClub(currentUser.club || '');
+    }
+  }, [currentUser, isOpen]);
   
   // File upload states
   const [rawFile, setRawFile] = useState<File | null>(null);
@@ -124,6 +135,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
       }
 
       await onSubmit({
+        authorId: currentUser?.id,
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
         authorName: authorName.trim(),
