@@ -261,12 +261,61 @@ export const storageService = {
     const all = this.getAllPublications();
     const index = all.findIndex(p => p.id === updatedPub.id);
     if (index !== -1) {
+      if (updatedPub.fileData) {
+        fileDataMemoryCache.set(updatedPub.id, updatedPub.fileData);
+        saveFileToIDB(updatedPub.id, updatedPub.fileData);
+      }
       all[index] = updatedPub;
       safeSavePublications(all);
       firebaseService.insertPublication(updatedPub).catch(() => {});
       return true;
     }
     return false;
+  },
+
+  // Direct helper to attach or replace a document file on a publication
+  async attachFileToPublication(
+    id: string,
+    fileData: string,
+    fileName?: string,
+    fileSize?: string,
+    embedUrl?: string,
+    rawFile?: File | Blob
+  ): Promise<Publication | null> {
+    const all = this.getAllPublications();
+    const index = all.findIndex(p => p.id === id);
+    if (index === -1) return null;
+
+    let cloudUrl = embedUrl || all[index].embedUrl;
+    if (rawFile && fileName) {
+      try {
+        const uploaded = await firebaseService.uploadPublicationFile(rawFile, id, fileName);
+        if (uploaded) cloudUrl = uploaded;
+      } catch (e) {
+        console.warn('Storage upload fallback:', e);
+      }
+    }
+
+    const lowerName = (fileName || '').toLowerCase();
+    const docType: Publication['type'] = (lowerName.endsWith('.docx') || lowerName.endsWith('.doc')) ? 'word' : 'pdf';
+
+    const updated: Publication = {
+      ...all[index],
+      fileData,
+      fileName: fileName || all[index].fileName,
+      fileSize: fileSize || all[index].fileSize,
+      embedUrl: cloudUrl || undefined,
+      type: docType
+    };
+
+    fileDataMemoryCache.set(id, fileData);
+    await saveFileToIDB(id, fileData);
+
+    all[index] = updated;
+    safeSavePublications(all);
+    firebaseService.insertPublication(updated).catch(() => {});
+
+    return updated;
   },
 
   // 10. User Like Management (1 like per user / toggle)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   X, 
   ExternalLink, 
@@ -9,7 +9,11 @@ import {
   Maximize2,
   Minimize2,
   Download,
-  Check
+  Check,
+  Upload,
+  Link2,
+  AlertCircle,
+  FileCheck
 } from 'lucide-react';
 import { Publication } from '../types';
 import { parseDocumentOrFlipbookUrl } from '../utils/embedHelper';
@@ -22,186 +26,6 @@ interface PublicationViewerModalProps {
   isAdminView?: boolean;
 }
 
-// Generate a clean digital document page HTML blob when no raw binary or external embed is available
-function createPublicationDocBlob(publication: Publication): string {
-  const contentParagraphs = (publication.content || publication.summary || 'No document content available.')
-    .split('\n\n')
-    .map(p => p.trim())
-    .filter(Boolean)
-    .map(p => {
-      if (p.startsWith('### ')) {
-        return `<h3 style="font-family: Georgia, serif; font-size: 20px; font-weight: 700; color: #3E1028; margin: 28px 0 12px 0;">${p.replace('### ', '')}</h3>`;
-      }
-      if (p.startsWith('> ')) {
-        return `<blockquote style="border-left: 4px solid #D95F7F; background: #FAF2EB; margin: 20px 0; padding: 14px 20px; font-style: italic; color: #3E1028; border-radius: 6px;">${p.replace('> ', '')}</blockquote>`;
-      }
-      return `<p style="margin: 0 0 18px 0; font-size: 15px; line-height: 1.8; color: #1e293b;">${p}</p>`;
-    })
-    .join('');
-
-  const docHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${publication.title}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 32px 16px;
-      background: #0f172a;
-      color: #334155;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-    }
-    .page-wrapper {
-      background: #ffffff;
-      width: 100%;
-      max-width: 820px;
-      min-height: 1080px;
-      padding: 56px 48px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-      border-radius: 6px;
-      margin-bottom: 32px;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .page-header {
-      border-bottom: 2px solid #D95F7F;
-      padding-bottom: 16px;
-      margin-bottom: 28px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .badge {
-      background: #FAF2EB;
-      color: #D95F7F;
-      padding: 5px 14px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border: 1px solid #F4E5DA;
-    }
-    .header-sub {
-      font-size: 12px;
-      color: #64748b;
-      font-weight: 600;
-    }
-    .doc-title {
-      font-family: Georgia, serif;
-      font-size: 30px;
-      font-weight: 700;
-      color: #3E1028;
-      margin: 0 0 10px 0;
-      line-height: 1.25;
-    }
-    .doc-subtitle {
-      font-size: 16px;
-      color: #D95F7F;
-      font-weight: 600;
-      margin: 0 0 20px 0;
-    }
-    .meta-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      font-size: 13px;
-      color: #64748b;
-      padding: 12px 16px;
-      background: #FAF2EB;
-      border-radius: 8px;
-      margin-bottom: 28px;
-    }
-    .summary-box {
-      background: #FDF9F6;
-      border-left: 4px solid #D95F7F;
-      padding: 16px 20px;
-      border-radius: 6px;
-      margin-bottom: 28px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #475569;
-    }
-    .summary-title {
-      font-weight: 700;
-      color: #D95F7F;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-    .content-area {
-      flex-grow: 1;
-    }
-    .page-footer {
-      border-top: 1px solid #e2e8f0;
-      padding-top: 16px;
-      margin-top: 40px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: #94a3b8;
-    }
-    @media (max-width: 640px) {
-      body { padding: 12px 8px; }
-      .page-wrapper { padding: 28px 20px; min-height: auto; }
-      .doc-title { font-size: 22px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="page-wrapper">
-    <div>
-      <div class="page-header">
-        <span class="badge">Project Sthree Shakthi</span>
-        <span class="header-sub">Cluster 05 Official Publication</span>
-      </div>
-
-      <h1 class="doc-title">${publication.title}</h1>
-      ${publication.subtitle ? `<div class="doc-subtitle">${publication.subtitle}</div>` : ''}
-
-      <div class="meta-bar">
-        <span><strong>Author:</strong> ${publication.authorName}</span>
-        ${publication.authorClub ? `<span>• <strong>Club:</strong> ${publication.authorClub}</span>` : ''}
-        <span>• <strong>Date:</strong> ${new Date(publication.submittedAt).toLocaleDateString()}</span>
-        ${publication.readTimeMinutes ? `<span>• <strong>Read Time:</strong> ${publication.readTimeMinutes} min</span>` : ''}
-      </div>
-
-      ${publication.summary ? `
-        <div class="summary-box">
-          <div class="summary-title">Executive Summary</div>
-          <div>${publication.summary}</div>
-        </div>
-      ` : ''}
-
-      <div class="content-area">
-        ${contentParagraphs}
-      </div>
-    </div>
-
-    <div class="page-footer">
-      <span>Project Sthree Shakthi • Rotaract District 3220</span>
-      <span>Document Publication Reader</span>
-    </div>
-  </div>
-</body>
-</html>`;
-
-  const blob = new Blob([docHtml], { type: 'text/html;charset=utf-8' });
-  return URL.createObjectURL(blob);
-}
-
 export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   publication,
   onClose,
@@ -210,26 +34,45 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 }) => {
   const [copiedToast, setCopiedToast] = useState(false);
   const [loadedFileData, setLoadedFileData] = useState<string | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  // Quick attach states
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkInputValue, setLinkInputValue] = useState('');
+  const [isAttaching, setIsAttaching] = useState(false);
+  const [attachSuccessToast, setAttachSuccessToast] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setLoadedFileData(publication?.fileData || null);
     setLikesCount(publication?.likes || 0);
     setHasLiked(publication ? storageService.hasUserLiked(publication.id) : false);
     setCopiedToast(false);
+    setShowLinkInput(false);
+    setLinkInputValue(publication?.embedUrl || '');
 
     if (publication) {
       document.body.style.overflow = 'hidden';
       if (!publication.fileData) {
+        setIsLoadingFile(true);
         storageService.getPublicationFileData(publication.id).then((data) => {
-          if (data) setLoadedFileData(data);
+          if (data) {
+            setLoadedFileData(data);
+          }
+          setIsLoadingFile(false);
+        }).catch(() => {
+          setIsLoadingFile(false);
         });
+      } else {
+        setIsLoadingFile(false);
       }
     } else {
       document.body.style.overflow = 'unset';
+      setIsLoadingFile(false);
     }
     return () => {
       document.body.style.overflow = 'unset';
@@ -246,7 +89,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
     const rawData = loadedFileData || publication.fileData;
 
     if (rawData) {
-      if (rawData.startsWith('data:') || rawData.startsWith('data:application/pdf')) {
+      if (rawData.startsWith('data:') || rawData.startsWith('data:application/pdf') || rawData.startsWith('data:application/octet-stream')) {
         try {
           const parts = rawData.split(',');
           const mimeMatch = parts[0].match(/:(.*?);/);
@@ -270,9 +113,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       const parsed = parseDocumentOrFlipbookUrl(publication.embedUrl);
       setBlobUrl(parsed.embedUrl || publication.embedUrl);
     } else {
-      // Generate clean HTML document blob so reader ALWAYS opens full-screen interactive reader
-      activeBlobUrl = createPublicationDocBlob(publication);
-      setBlobUrl(activeBlobUrl);
+      setBlobUrl(null);
     }
 
     return () => {
@@ -297,6 +138,58 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       publication.title.toLowerCase().endsWith('.docx') || 
       publication.title.toLowerCase().endsWith('.doc')
     ));
+
+  // Handler for uploading/attaching document file
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAttaching(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      const sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+      
+      setLoadedFileData(dataUrl);
+
+      // Persist to IDB, memory cache, and update publication
+      await storageService.attachFileToPublication(
+        publication.id,
+        dataUrl,
+        file.name,
+        sizeStr,
+        undefined,
+        file
+      );
+
+      setIsAttaching(false);
+      setAttachSuccessToast(true);
+      setTimeout(() => setAttachSuccessToast(false), 3000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handler for saving document link
+  const handleSaveDocLink = async () => {
+    if (!linkInputValue.trim()) return;
+    setIsAttaching(true);
+    const parsed = parseDocumentOrFlipbookUrl(linkInputValue.trim());
+    const finalUrl = parsed.embedUrl || linkInputValue.trim();
+
+    await storageService.attachFileToPublication(
+      publication.id,
+      '',
+      publication.fileName || `${publication.title}.pdf`,
+      publication.fileSize || 'Cloud Document',
+      finalUrl
+    );
+
+    setBlobUrl(finalUrl);
+    setIsAttaching(false);
+    setShowLinkInput(false);
+    setAttachSuccessToast(true);
+    setTimeout(() => setAttachSuccessToast(false), 3000);
+  };
 
   const handleShareClick = async (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
@@ -345,17 +238,35 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-3 md:p-6">
+      
+      {/* Hidden File Input for attaching document */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelected}
+        accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="hidden"
+      />
+
       <div 
         className={`relative w-full flex flex-col overflow-hidden bg-slate-900 shadow-2xl transition-all duration-300 border border-[#F4E5DA] ${
           isFullScreen ? 'h-full w-full max-w-[1920px] rounded-none sm:rounded-3xl' : 'max-w-5xl h-[100dvh] sm:h-[92vh] rounded-none sm:rounded-[32px]'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Share notification banner */}
+        {/* Toast: Link copied */}
         {copiedToast && (
           <div className="absolute top-16 right-4 sm:right-6 z-50 px-4 py-2 rounded-2xl bg-[#3E1028] text-white text-xs font-bold shadow-xl border border-[#D95F7F] flex items-center gap-2 animate-in slide-in-from-top duration-200">
             <Check className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Link copied to clipboard!</span>
+          </div>
+        )}
+
+        {/* Toast: File Attached */}
+        {attachSuccessToast && (
+          <div className="absolute top-16 right-4 sm:right-6 z-50 px-4 py-2 rounded-2xl bg-emerald-700 text-white text-xs font-bold shadow-xl border border-emerald-400 flex items-center gap-2 animate-in slide-in-from-top duration-200">
+            <FileCheck className="w-4 h-4 text-white shrink-0" />
+            <span>Document file attached successfully!</span>
           </div>
         )}
 
@@ -390,6 +301,19 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            
+            {/* Attach / Replace File Button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isAttaching}
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 min-h-[36px] rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-slate-100 border border-[#F4E5DA] shadow-2xs cursor-pointer touch-manipulation active:scale-95"
+              title="Attach or replace document file (.pdf / .docx)"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#D95F7F]" />
+              <span className="hidden md:inline">{effectiveDocUrl ? 'Replace PDF' : 'Attach PDF'}</span>
+            </button>
+
             {publication.embedUrl && (
               <a
                 href={publication.embedUrl}
@@ -463,7 +387,12 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
         {/* Modal Main Body: 100% Full-Screen Interactive Document / PDF Viewer */}
         <div className="flex-1 w-full h-full min-h-0 relative bg-slate-900 flex flex-col overflow-hidden">
-          {effectiveDocUrl ? (
+          {isLoadingFile ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white space-y-3">
+              <div className="w-10 h-10 border-4 border-[#D95F7F] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-semibold text-slate-300">Loading document file...</p>
+            </div>
+          ) : effectiveDocUrl ? (
             <object
               data={effectiveDocUrl}
               type={isWordType ? undefined : 'application/pdf'}
@@ -484,8 +413,69 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               />
             </object>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white">
-              <div className="w-8 h-8 border-4 border-[#D95F7F] border-t-transparent rounded-full animate-spin" />
+            /* Interactive Screen when Document file is not yet attached */
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900 overflow-y-auto">
+              <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-[#D95F7F]/20 border border-[#D95F7F]/40 text-[#D95F7F] flex items-center justify-center mx-auto shadow-inner">
+                  <FileText className="w-8 h-8" />
+                </div>
+
+                <div className="space-y-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 text-rose-300 text-[11px] font-bold uppercase tracking-wider border border-rose-800">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Original PDF File Required
+                  </span>
+                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-white pt-1">
+                    {publication.title}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    The document file (<strong>{publication.fileName || `${publication.title}.pdf`}</strong>) needs to be attached to view the complete interactive document.
+                  </p>
+                </div>
+
+                {/* Attach File Button */}
+                <div className="space-y-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isAttaching}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#D95F7F] hover:bg-[#BE4465] text-white font-bold text-sm shadow-lg shadow-[#D95F7F]/30 transition-all hover:scale-102 cursor-pointer touch-manipulation active:scale-95"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>{isAttaching ? 'Attaching File...' : '📎 Select & Attach PDF File'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkInput(!showLinkInput)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-300 font-semibold text-xs border border-white/10 transition-all cursor-pointer"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-[#D95F7F]" />
+                    <span>{showLinkInput ? 'Hide Link Input' : 'Or Paste Google Drive / Cloud Link'}</span>
+                  </button>
+                </div>
+
+                {/* Link input dropdown */}
+                {showLinkInput && (
+                  <div className="space-y-2 pt-2 border-t border-slate-700/60 animate-in fade-in duration-200">
+                    <input
+                      type="url"
+                      value={linkInputValue}
+                      onChange={(e) => setLinkInputValue(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/... or PDF URL"
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-[#D95F7F]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveDocLink}
+                      disabled={isAttaching || !linkInputValue.trim()}
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      Save Document Link & View
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

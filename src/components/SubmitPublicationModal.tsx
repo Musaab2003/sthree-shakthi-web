@@ -113,6 +113,16 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     setSubmitError('');
 
     try {
+      let finalFileData = fileData;
+      if (!finalFileData && rawFile) {
+        finalFileData = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onload = (ev) => resolve((ev.target?.result as string) || '');
+          r.onerror = () => resolve('');
+          r.readAsDataURL(rawFile);
+        });
+      }
+
       await onSubmit({
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
@@ -126,7 +136,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
         embedUrl: embedUrl.trim() || undefined,
         fileName: fileName || undefined,
         fileSize: fileSize || undefined,
-        fileData: fileData || undefined,
+        fileData: finalFileData || undefined,
         coverImage: DEFAULT_COVER,
         tags: ['SthreeShakthi', 'Cluster05'],
         readTimeMinutes: Math.max(3, Math.ceil((content.length || summary.length) / 200) + 2)
