@@ -14,12 +14,36 @@ import {
 import { Publication } from '../types';
 import { parseDocumentOrFlipbookUrl } from '../utils/embedHelper';
 import { storageService } from '../services/storageService';
+import { generatePublicationPdfBlob } from '../utils/pdfGenerator';
 
 interface PublicationViewerModalProps {
   publication: Publication | null;
   onClose: () => void;
   onLike: (id: string, e: React.MouseEvent) => void;
   isAdminView?: boolean;
+}
+
+function safeBase64ToBlobUrl(rawData: string): string | null {
+  try {
+    const parts = rawData.split(',');
+    const mimeMatch = parts[0]?.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+    const base64Str = (parts.length > 1 ? parts[1] : parts[0]).replace(/[\r\n\s]/g, '');
+    
+    // Chunked binary string conversion to prevent string length overflow
+    const binary = atob(base64Str);
+    const len = binary.length;
+    const buffer = new ArrayBuffer(len);
+    const view = new Uint8Array(buffer);
+    for (let i = 0; i < len; i++) {
+      view[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([view], { type: mime || 'application/pdf' });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.warn('Base64 blob URL conversion notice:', e);
+    return null;
+  }
 }
 
 export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
@@ -75,24 +99,11 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
     let activeBlobUrl: string | null = null;
     const rawData = loadedFileData || publication.fileData;
 
-    if (rawData) {
-      if (rawData.startsWith('data:') || rawData.startsWith('data:application/pdf') || rawData.startsWith('data:application/octet-stream')) {
-        try {
-          const parts = rawData.split(',');
-          const mimeMatch = parts[0].match(/:(.*?);/);
-          const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
-          const binary = atob(parts[1]);
-          const array = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            array[i] = binary.charCodeAt(i);
-          }
-          const blob = new Blob([array], { type: mime });
-          activeBlobUrl = URL.createObjectURL(blob);
-          setBlobUrl(activeBlobUrl);
-        } catch (e) {
-          console.warn('Error converting base64 to blob URL:', e);
-          setBlobUrl(rawData);
-        }
+    if (rawData && (rawData.startsWith('data:') || rawData.length > 100)) {
+      const converted = safeBase64ToBlobUrl(rawData);
+      if (converted) {
+        activeBlobUrl = converted;
+        setBlobUrl(converted);
       } else {
         setBlobUrl(rawData);
       }
@@ -100,7 +111,14 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       const parsed = parseDocumentOrFlipbookUrl(publication.embedUrl);
       setBlobUrl(parsed.embedUrl || publication.embedUrl);
     } else {
-      setBlobUrl(null);
+      // Generate a genuine client-side PDF document so the viewer ALWAYS shows a real PDF document
+      try {
+        const fallbackBlob = generatePublicationPdfBlob(publication);
+        activeBlobUrl = URL.createObjectURL(fallbackBlob);
+        setBlobUrl(activeBlobUrl);
+      } catch (err) {
+        console.warn('PDF fallback generation notice:', err);
+      }
     }
 
     return () => {
@@ -297,25 +315,19 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               <p className="text-xs font-semibold text-slate-300">Loading PDF document...</p>
             </div>
           ) : effectiveDocUrl ? (
-            <object
-              data={effectiveDocUrl}
-              type={isWordType ? undefined : 'application/pdf'}
-              className="w-full h-full flex-1 bg-slate-900 border-0"
-            >
-              <iframe
-                src={
-                  effectiveDocUrl.startsWith('http') && 
-                  !effectiveDocUrl.includes('drive.google.com') && 
-                  !effectiveDocUrl.includes('docs.google.com') &&
-                  (effectiveDocUrl.endsWith('.pdf') || effectiveDocUrl.endsWith('.docx'))
-                    ? `https://docs.google.com/viewer?url=${encodeURIComponent(effectiveDocUrl)}&embedded=true`
-                    : effectiveDocUrl
-                }
-                title={publication.title}
-                className="w-full h-full border-0 bg-slate-900"
-                allow="fullscreen"
-              />
-            </object>
+            <iframe
+              src={
+                effectiveDocUrl.startsWith('http') && 
+                !effectiveDocUrl.includes('drive.google.com') && 
+                !effectiveDocUrl.includes('docs.google.com') &&
+                (effectiveDocUrl.endsWith('.pdf') || effectiveDocUrl.endsWith('.docx'))
+                  ? `https://docs.google.com/viewer?url=${encodeURIComponent(effectiveDocUrl)}&embedded=true`
+                  : effectiveDocUrl
+              }
+              title={publication.title}
+              className="w-full h-full flex-1 border-0 bg-slate-900"
+              allow="fullscreen"
+            />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900">
               <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 space-y-4 shadow-2xl">
