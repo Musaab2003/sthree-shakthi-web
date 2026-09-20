@@ -354,7 +354,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     const cleanUser = usernameInput.trim().toLowerCase();
     const cleanPass = passwordInput.trim();
 
-    // 1. Master fallback password 'admin123'
+    // 1. Direct login checks for configured admin credentials
+    if (
+      (cleanUser === 'blackcat' || !cleanUser) && 
+      (cleanPass === 'Batman@Ironman' || cleanPass === 'batman@ironman')
+    ) {
+      setIsAuthenticated(true);
+      try {
+        sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
+      } catch {}
+      setAuthError('');
+      return;
+    }
+
     if ((cleanUser === 'admin' || !cleanUser) && cleanPass === 'admin123') {
       setIsAuthenticated(true);
       try {

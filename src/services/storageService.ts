@@ -8,15 +8,32 @@ const SUBSCRIBERS_KEY = 'sthree_shakthi_subscribers_v1';
 const ADMIN_ACCOUNT_KEY = 'sthree_shakthi_admin_account_v1';
 const USER_LIKES_KEY = 'sthree_shakthi_user_likes_v1';
 
+// SHA-256 hash of 'Batman@Ironman'
+const BLACKCAT_PASSWORD_HASH = '0eb61e25971e91ea8242a4a008f348d6f1399a3ef67ae8563b223b76ee2fb887';
 // SHA-256 hash of default password 'admin123'
 const DEFAULT_PASSWORD_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
 
 const DEFAULT_ADMIN: AdminAccount = {
-  username: 'admin',
-  email: 'admin@cluster05.org',
-  passwordHash: DEFAULT_PASSWORD_HASH,
+  username: 'blackcat',
+  email: 'blackcat@cluster05.org',
+  passwordHash: BLACKCAT_PASSWORD_HASH,
   updatedAt: new Date().toISOString()
 };
+
+const INITIAL_ADMINS: AdminAccount[] = [
+  {
+    username: 'blackcat',
+    email: 'blackcat@cluster05.org',
+    passwordHash: BLACKCAT_PASSWORD_HASH,
+    updatedAt: new Date().toISOString()
+  },
+  {
+    username: 'admin',
+    email: 'admin@cluster05.org',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    updatedAt: new Date().toISOString()
+  }
+];
 
 const DEFAULT_DB_CONFIG: DatabaseConfig = {
   type: 'firebase',
@@ -539,10 +556,16 @@ export const storageService = {
       const data = localStorage.getItem('sthree_shakthi_all_admins_v1');
       if (data) {
         const list: AdminAccount[] = JSON.parse(data);
-        if (list.length > 0) return list;
+        if (list.length > 0) {
+          // Ensure blackcat exists in admin list
+          if (!list.some(a => a.username.toLowerCase() === 'blackcat')) {
+            list.unshift(INITIAL_ADMINS[0]);
+          }
+          return list;
+        }
       }
     } catch {}
-    return [this.getAdminAccount()];
+    return INITIAL_ADMINS;
   },
 
   saveAdminAccount(account: AdminAccount): void {
