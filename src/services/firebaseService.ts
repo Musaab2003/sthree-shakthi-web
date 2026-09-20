@@ -690,6 +690,52 @@ export const firebaseService = {
     }
   },
 
+  async deleteUser(email: string): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !email) return false;
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const docId = cleanEmail.replace(/\./g, '___');
+      await deleteDoc(doc(db, 'users', docId));
+      return true;
+    } catch (e) {
+      console.warn('Firebase deleteUser error:', e);
+      return false;
+    }
+  },
+
+  async purgeSampleDataFromCloud(): Promise<{ deletedCount: number; message: string }> {
+    const db = this.getDb();
+    if (!db) return { deletedCount: 0, message: 'Database not connected' };
+    try {
+      let count = 0;
+      const snap = await getDocs(collection(db, 'publications'));
+      const sampleKeywords = ['sample', 'dummy', 'empowering rural', 'test submission', 'women in leadership', 'artisan', 'mock'];
+      
+      const deletions = [];
+      for (const d of snap.docs) {
+        const data = d.data();
+        const title = (data.title || '').toLowerCase();
+        const author = (data.authorName || '').toLowerCase();
+        const isSample = sampleKeywords.some(kw => title.includes(kw) || author.includes(kw)) || d.id.startsWith('sample-');
+        if (isSample) {
+          deletions.push(deleteDoc(d.ref));
+          count++;
+        }
+      }
+      
+      for (let i = 0; i < 30; i++) {
+        deletions.push(deleteDoc(doc(db, 'publications', `chunk-sample-${i}`)).catch(() => {}));
+      }
+
+      await Promise.all(deletions);
+      return { deletedCount: count, message: `Successfully removed ${count} sample records from Firebase Cloud.` };
+    } catch (e: any) {
+      console.warn('Firebase purgeSampleData notice:', e);
+      return { deletedCount: 0, message: e?.message || 'Error purging sample data' };
+    }
+  },
+
   // 6. Registration Email OTP Verification Storage
   async saveEmailOtp(email: string, otp: string, expiresAt: number): Promise<boolean> {
     const db = this.getDb();

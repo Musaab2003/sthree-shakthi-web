@@ -671,6 +671,50 @@ export const storageService = {
     firebaseService.saveUser(user).catch(() => {});
   },
 
+  async deleteUserAccount(email: string): Promise<boolean> {
+    const cleanEmail = email.trim().toLowerCase();
+    let all = this.getAllUsers().filter(u => u.email.toLowerCase() !== cleanEmail);
+    localStorage.setItem(ALL_USERS_KEY, JSON.stringify(all));
+    return await firebaseService.deleteUser(cleanEmail);
+  },
+
+  async syncAllUsersToCloud(): Promise<void> {
+    try {
+      const localUsers = this.getAllUsers();
+      for (const u of localUsers) {
+        await firebaseService.saveUser(u).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('syncAllUsersToCloud notice:', e);
+    }
+  },
+
+  async purgeSampleData(): Promise<{ deletedCount: number; message: string }> {
+    try {
+      // 1. Purge from Firebase Cloud
+      const cloudResult = await firebaseService.purgeSampleDataFromCloud();
+
+      // 2. Purge from local storage
+      const sampleKeywords = ['sample', 'dummy', 'empowering rural', 'test submission', 'women in leadership', 'artisan', 'mock'];
+      let localPubs = this.getAllPublications();
+      const initialCount = localPubs.length;
+      localPubs = localPubs.filter(p => {
+        const title = (p.title || '').toLowerCase();
+        const author = (p.authorName || '').toLowerCase();
+        return !sampleKeywords.some(kw => title.includes(kw) || author.includes(kw)) && !p.id.startsWith('sample-');
+      });
+      safeSavePublications(localPubs);
+
+      const localPurged = initialCount - localPubs.length;
+      return {
+        deletedCount: cloudResult.deletedCount + localPurged,
+        message: cloudResult.message || `Cleaned sample data successfully.`
+      };
+    } catch (e: any) {
+      return { deletedCount: 0, message: e?.message || 'Error purging sample data' };
+    }
+  },
+
   // 13. Registration Email OTP Verification Flow
   async sendRegistrationOtp(
     email: string,
