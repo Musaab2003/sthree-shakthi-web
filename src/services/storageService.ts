@@ -129,6 +129,11 @@ function safeSavePublications(all: Publication[]) {
 }
 
 export const storageService = {
+  // Save publications to localStorage
+  savePublications(pubs: Publication[]): void {
+    safeSavePublications(pubs);
+  },
+
   // Re-hydrate any list of publications with local in-memory/IDB file data
   rehydratePublicationsWithLocalFiles(pubs: Publication[]): Publication[] {
     return pubs.map(p => {

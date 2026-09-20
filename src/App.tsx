@@ -38,7 +38,9 @@ export function App() {
     const performCloudSync = async () => {
       const { publications: syncedPubs } = await storageService.syncFromCloud();
       if (syncedPubs) {
-        setAllPublications(storageService.rehydratePublicationsWithLocalFiles(syncedPubs));
+        const rehydrated = storageService.rehydratePublicationsWithLocalFiles(syncedPubs);
+        setAllPublications(rehydrated);
+        storageService.savePublications(rehydrated);
       }
     };
 
@@ -48,7 +50,9 @@ export function App() {
     // Attach real-time Firebase Firestore listener
     const unsubPubs = firebaseService.listenToPublications((livePubs) => {
       if (livePubs && Array.isArray(livePubs)) {
-        setAllPublications(storageService.rehydratePublicationsWithLocalFiles(livePubs));
+        const rehydrated = storageService.rehydratePublicationsWithLocalFiles(livePubs);
+        setAllPublications(rehydrated);
+        storageService.savePublications(rehydrated);
       }
     });
 

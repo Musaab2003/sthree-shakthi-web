@@ -151,7 +151,7 @@ export const firebaseService = {
     const db = this.getDb();
     if (!db) return null;
     try {
-      const q = query(collection(db, 'publications'), orderBy('submittedAt', 'desc'));
+      const q = collection(db, 'publications');
       return onSnapshot(q, (snapshot) => {
         const pubs: Publication[] = snapshot.docs.map(d => {
           const data = d.data();
@@ -182,6 +182,7 @@ export const firebaseService = {
             readTimeMinutes: Number(data.readTimeMinutes) || 5
           };
         });
+        pubs.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
         callback(pubs);
       }, (error) => {
         console.warn('Firebase publications listener notice:', error);
@@ -196,9 +197,9 @@ export const firebaseService = {
     const db = this.getDb();
     if (!db) return null;
     try {
-      const q = query(collection(db, 'publications'), orderBy('submittedAt', 'desc'));
+      const q = collection(db, 'publications');
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => {
+      const pubs: Publication[] = snapshot.docs.map(d => {
         const data = d.data();
         return {
           id: d.id,
@@ -227,6 +228,8 @@ export const firebaseService = {
           readTimeMinutes: Number(data.readTimeMinutes) || 5
         };
       });
+      pubs.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+      return pubs;
     } catch (err) {
       console.warn('Firebase syncAllPublications warning:', err);
       return null;
