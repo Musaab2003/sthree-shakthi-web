@@ -15,6 +15,7 @@ import { Publication } from '../types';
 import { parseDocumentOrFlipbookUrl } from '../utils/embedHelper';
 import { storageService } from '../services/storageService';
 import { generatePublicationPdfBlob } from '../utils/pdfGenerator';
+import { PdfCanvasViewer } from './PdfCanvasViewer';
 
 interface PublicationViewerModalProps {
   publication: Publication | null;
@@ -325,19 +326,19 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               <p className="text-xs font-semibold text-slate-300">Loading PDF document...</p>
             </div>
           ) : effectiveDocUrl ? (
-            <iframe
-              src={
-                effectiveDocUrl.startsWith('http') && 
-                !effectiveDocUrl.includes('drive.google.com') && 
-                !effectiveDocUrl.includes('docs.google.com') &&
-                (effectiveDocUrl.endsWith('.pdf') || effectiveDocUrl.endsWith('.docx'))
-                  ? `https://docs.google.com/viewer?url=${encodeURIComponent(effectiveDocUrl)}&embedded=true`
-                  : effectiveDocUrl
-              }
-              title={publication.title}
-              className="w-full h-full flex-1 border-0 bg-slate-900"
-              allow="fullscreen"
-            />
+            publication.embedUrl && !publication.embedUrl.endsWith('.pdf') && !publication.embedUrl.endsWith('.docx') ? (
+              <iframe
+                src={effectiveDocUrl}
+                title={publication.title}
+                className="w-full h-full flex-1 border-0 bg-slate-900"
+                allow="fullscreen"
+              />
+            ) : (
+              <PdfCanvasViewer
+                dataUrlOrBlob={loadedFileData || publication.fileData || effectiveDocUrl}
+                title={publication.title}
+              />
+            )
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900">
               <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 space-y-4 shadow-2xl">
