@@ -540,55 +540,14 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                 )}
               </div>
             ) : (
-              /* PDF Showcase & Editorial Article Reader (When direct stream is loading or external) */
+              /* PDF Showcase & Editorial Article Reader (Direct readable blog article) */
               <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-white my-2 sm:my-4 rounded-2xl sm:rounded-3xl shadow-sm border border-[#F4E5DA]">
                 
-                {/* PDF Document Notice Banner */}
-                <div className="p-4 rounded-2xl bg-[#FAF2EB] border border-[#F4E5DA] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-[#D95F7F] text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs shrink-0">
-                      PDF
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className="text-xs sm:text-sm font-bold text-[#3E1028] truncate">
-                        {publication.fileName || `${publication.title}.pdf`}
-                      </h4>
-                      <p className="text-[10px] sm:text-[11px] text-[#5C1D3B]/70 truncate">
-                        {publication.fileSize || 'PDF Publication'} • Official Submission
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
-                    {isAdminView && currentFileData && (
-                      <a
-                        href={currentFileData}
-                        download={publication.fileName || `${publication.title}.pdf`}
-                        className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md transition-all shrink-0 touch-manipulation cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </a>
-                    )}
-                    {publication.embedUrl && (
-                      <a
-                        href={publication.embedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md transition-all shrink-0 touch-manipulation cursor-pointer"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Open Document</span>
-                      </a>
-                    )}
-                  </div>
-                </div>
-
                 {/* Article Header */}
                 <div className="space-y-3 border-b border-[#F4E5DA] pb-6">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-[#D95F7F] text-xs font-extrabold uppercase tracking-wider border border-rose-200">
                     <FileText className="w-3.5 h-3.5" />
-                    Editorial Document Publication
+                    Document Publication
                   </span>
 
                   <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#3E1028] leading-tight">
@@ -621,111 +580,49 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
                 {/* Summary / Overview Box */}
                 {publication.summary && (
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-1.5">
+                  <div className="p-5 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-2">
                     <div className="text-[11px] font-bold text-[#D95F7F] uppercase tracking-wider">
                       Summary & Executive Overview
                     </div>
-                    <p className="text-xs sm:text-sm text-[#3E1028] leading-relaxed">
+                    <p className="text-sm text-[#3E1028] leading-relaxed">
                       {publication.summary}
                     </p>
                   </div>
                 )}
 
                 {/* Article Body Content */}
-                {publication.content ? (
-                  <div className="text-[#3E1028] leading-relaxed space-y-4 text-xs sm:text-base">
-                    {publication.content.split('\n\n').map((para, i) => {
+                <div className="text-[#3E1028] leading-relaxed space-y-4 text-sm sm:text-base pt-2">
+                  {publication.content ? (
+                    publication.content.split('\n\n').map((para, i) => {
                       if (para.startsWith('### ')) {
                         return <h3 key={i} className="font-serif text-base sm:text-lg font-bold text-[#3E1028] mt-6 mb-2">{para.replace('### ', '')}</h3>;
                       }
                       if (para.startsWith('> ')) {
                         return (
-                          <blockquote key={i} className="p-3.5 sm:p-4 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-xs sm:text-sm my-4">
+                          <blockquote key={i} className="p-4 rounded-xl bg-[#FAF2EB] border-l-4 border-[#D95F7F] text-[#3E1028] italic text-sm my-4">
                             {para.replace('> ', '')}
                           </blockquote>
                         );
                       }
                       return <p key={i}>{para}</p>;
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#FAF2EB] via-white to-[#FFF5F8] border-2 border-dashed border-[#D95F7F]/40 text-center space-y-5 shadow-xs">
-                    <div className="w-16 h-16 rounded-3xl bg-rose-100 text-[#D95F7F] flex items-center justify-center mx-auto shadow-inner">
-                      <Upload className="w-8 h-8" />
-                    </div>
-                    <div className="space-y-1.5 max-w-lg mx-auto">
-                      <h4 className="font-serif text-lg sm:text-xl font-bold text-[#3E1028]">
-                        Open or Attach Document to Read
-                      </h4>
-                      <p className="text-xs sm:text-sm text-[#5C1D3B]/80 leading-relaxed">
-                        To view and read the full document pages for <strong>"{publication.title}"</strong>, select your document file or connect a Google Drive link.
+                    })
+                  ) : (
+                    <div className="space-y-4 text-sm text-[#5C1D3B]/90">
+                      <p className="leading-relaxed">
+                        Welcome to the digital publication of <strong>"{publication.title}"</strong> contributed by <strong>{publication.authorName}</strong> as part of <strong>Project Sthree Shakthi</strong>.
+                      </p>
+                      {publication.summary && (
+                        <div className="p-4 rounded-xl bg-white border border-[#F4E5DA] space-y-1.5 shadow-2xs">
+                          <div className="font-bold text-[#3E1028] text-xs uppercase tracking-wider">Key Highlights:</div>
+                          <p className="text-xs sm:text-sm text-[#3E1028] leading-relaxed">{publication.summary}</p>
+                        </div>
+                      )}
+                      <p className="text-xs text-[#5C1D3B]/70 italic pt-2">
+                        Published by Rotaract District 3220, Cluster 05 Editorial Board in support of women empowerment and community impact.
                       </p>
                     </div>
-
-                    {fileUploadSuccessToast && (
-                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 animate-in fade-in">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Document loaded & synced successfully!</span>
-                      </div>
-                    )}
-
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                      <label className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-lg shadow-[#D95F7F]/30 transition-all hover:scale-105 cursor-pointer touch-manipulation">
-                        {isUploadingFile ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Uploading & Loading Reader...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="w-4 h-4" />
-                            <span>Select Document from Device to Read</span>
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          accept=".pdf,.docx,.doc,application/pdf"
-                          onChange={handleInlineFileUpload}
-                          disabled={isUploadingFile}
-                          className="hidden"
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowLinkInput(!showLinkInput)}
-                        className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full text-xs font-bold text-[#5C1D3B] hover:text-[#3E1028] bg-white hover:bg-slate-100 border border-[#F4E5DA] transition-all"
-                      >
-                        <Link2 className="w-4 h-4 text-[#D95F7F]" />
-                        <span>{showLinkInput ? 'Hide Link Option' : 'Attach Google Drive / Cloud Link'}</span>
-                      </button>
-                    </div>
-
-                    {showLinkInput && (
-                      <div className="pt-3 max-w-md mx-auto space-y-2 text-left animate-in fade-in">
-                        <label className="block text-[11px] font-bold text-[#3E1028]">
-                          Paste Google Drive, Flipbook, or Document Link:
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="url"
-                            placeholder="https://drive.google.com/file/d/..."
-                            value={linkInput}
-                            onChange={(e) => setLinkInput(e.target.value)}
-                            className="flex-grow px-3 py-2 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSaveLink}
-                            className="px-4 py-2 rounded-xl bg-[#D95F7F] hover:bg-[#BE4465] text-white text-xs font-bold transition-colors shrink-0"
-                          >
-                            Save & View
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Footer Interaction Bar */}
                 <div className="pt-6 border-t border-[#F4E5DA] flex flex-wrap items-center justify-between gap-3">
