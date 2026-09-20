@@ -246,7 +246,7 @@ export const PdfCanvasViewer: React.FC<PdfCanvasViewerProps> = ({ dataUrlOrBlob,
         {/* Clean Single Canvas (No overlapping, perfectly centered) */}
         <canvas
           ref={canvasRef}
-          className={`shadow-2xl rounded-lg bg-white max-w-full transition-all duration-200 ${loading ? 'hidden' : 'block'}`}
+          className={`shadow-2xl rounded-lg bg-white max-w-full transition-all duration-200 ${loading || error ? 'hidden' : 'block'}`}
         />
       </div>
     </div>

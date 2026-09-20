@@ -16,6 +16,7 @@ import { parseDocumentOrFlipbookUrl } from '../utils/embedHelper';
 import { storageService } from '../services/storageService';
 import { generatePublicationPdfBlob } from '../utils/pdfGenerator';
 import { PdfCanvasViewer } from './PdfCanvasViewer';
+import { DocxViewer } from './DocxViewer';
 
 interface PublicationViewerModalProps {
   publication: Publication | null;
@@ -24,14 +25,14 @@ interface PublicationViewerModalProps {
   isAdminView?: boolean;
 }
 
-function safeBase64ToBlobUrl(rawData: string): string | null {
+function safeBase64ToBlobUrl(rawData: string, defaultMime: string = 'application/pdf'): string | null {
   try {
     if (rawData.startsWith('http://') || rawData.startsWith('https://') || rawData.startsWith('blob:')) {
       return rawData;
     }
     const parts = rawData.split(',');
     const mimeMatch = parts[0]?.match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+    const mime = mimeMatch ? mimeMatch[1] : defaultMime;
     const base64Str = (parts.length > 1 ? parts[1] : parts[0]).replace(/[\r\n\s]/g, '');
     
     // Chunked binary string conversion to prevent string length overflow
@@ -42,7 +43,7 @@ function safeBase64ToBlobUrl(rawData: string): string | null {
     for (let i = 0; i < len; i++) {
       view[i] = binary.charCodeAt(i);
     }
-    const blob = new Blob([view], { type: mime || 'application/pdf' });
+    const blob = new Blob([view], { type: mime || defaultMime });
     return URL.createObjectURL(blob);
   } catch (e) {
     console.warn('Base64 blob URL conversion notice:', e);
@@ -120,9 +121,26 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
     let activeBlobUrl: string | null = null;
     const rawData = loadedFileData || publication.fileData;
+    const docIsWord = Boolean(
+      publication.type === 'word' || 
+      (publication.fileName && (
+        publication.fileName.toLowerCase().endsWith('.docx') || 
+        publication.fileName.toLowerCase().endsWith('.doc') || 
+        publication.fileName.toLowerCase().includes('.docx') || 
+        publication.fileName.toLowerCase().includes('.doc')
+      )) ||
+      (publication.title && (
+        publication.title.toLowerCase().endsWith('.docx') || 
+        publication.title.toLowerCase().endsWith('.doc')
+      ))
+    );
+
+    const defaultMime = docIsWord 
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      : 'application/pdf';
 
     if (rawData && (rawData.startsWith('data:') || rawData.startsWith('http://') || rawData.startsWith('https://') || rawData.startsWith('blob:') || rawData.length > 100)) {
-      const converted = safeBase64ToBlobUrl(rawData);
+      const converted = safeBase64ToBlobUrl(rawData, defaultMime);
       if (converted) {
         activeBlobUrl = converted;
         setBlobUrl(converted);
@@ -329,12 +347,14 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Main Body: 100% Full-Screen Interactive Document / PDF Viewer */}
+        {/* Modal Main Body: 100% Full-Screen Interactive Document / PDF / Word Viewer */}
         <div className="flex-1 w-full h-full min-h-0 relative bg-slate-900 flex flex-col overflow-hidden">
           {isLoadingFile ? (
             <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white space-y-3">
               <div className="w-10 h-10 border-4 border-[#D95F7F] border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs font-semibold text-slate-300">Loading PDF document...</p>
+              <p className="text-xs font-semibold text-slate-300">
+                Loading {isWordType ? 'Word document' : 'PDF document'}...
+              </p>
             </div>
           ) : effectiveDocUrl ? (
             publication.embedUrl && !publication.embedUrl.endsWith('.pdf') && !publication.embedUrl.endsWith('.docx') ? (
@@ -343,6 +363,11 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                 title={publication.title}
                 className="w-full h-full flex-1 border-0 bg-slate-900"
                 allow="fullscreen"
+              />
+            ) : isWordType ? (
+              <DocxViewer
+                dataUrlOrBlob={loadedFileData || publication.fileData || effectiveDocUrl}
+                title={publication.title}
               />
             ) : (
               <PdfCanvasViewer
