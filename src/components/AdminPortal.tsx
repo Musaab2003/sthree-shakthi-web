@@ -351,78 +351,49 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setAuthError('');
     const cleanUser = usernameInput.trim().toLowerCase();
     const cleanPass = passwordInput.trim();
 
-    // 1. Direct login checks for configured admin credentials
-    if (
-      (cleanUser === 'blackcat' || !cleanUser) && 
-      (cleanPass === 'Batman@Ironman' || cleanPass === 'batman@ironman')
-    ) {
-      setIsAuthenticated(true);
-      try {
-        sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
-      } catch {}
-      setAuthError('');
+    if (!cleanUser || !cleanPass) {
+      setAuthError('Please enter both username and password.');
       return;
     }
 
-    if ((cleanUser === 'admin' || !cleanUser) && cleanPass === 'admin123') {
-      setIsAuthenticated(true);
-      try {
-        sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
-      } catch {}
-      setAuthError('');
-      return;
-    }
-
-    // 2. Fetch latest admins from Firebase Cloud Firestore & local cache
-    let currentAdmins = storageService.getAllAdmins();
     try {
-      const remoteAdmins = await firebaseService.getAdmins();
-      if (remoteAdmins.length > 0) {
-        currentAdmins = remoteAdmins;
-        setAllAdmins(remoteAdmins);
+      // 1. Check directly against Firebase Firestore database admins collection
+      let adminData = await firebaseService.getAdminByUsername(cleanUser);
+      
+      // 2. If not found by direct doc, search all admins in Firestore
+      if (!adminData) {
+        const allRemote = await firebaseService.getAdmins();
+        adminData = allRemote.find(a => a.username.toLowerCase() === cleanUser) || null;
       }
-    } catch {}
 
-    // 3. Search for matching admin user
-    const matched = currentAdmins.find(a => a.username.toLowerCase() === cleanUser);
-
-    if (matched) {
-      const isPlainMatch = cleanPass === matched.passwordHash || cleanPass === 'admin123' || cleanPass === '1';
-      const isHashMatch = await verifyPassword(cleanPass, matched.passwordHash);
-      if (isPlainMatch || isHashMatch) {
-        setIsAuthenticated(true);
-        try {
-          sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
-        } catch {}
-        setAuthError('');
-        return;
+      // 3. Check local cache fallback
+      if (!adminData) {
+        const localAdmins = storageService.getAllAdmins();
+        adminData = localAdmins.find(a => a.username.toLowerCase() === cleanUser) || null;
       }
-    }
 
-    // 4. Check primary stored admin account
-    const primaryAccount = storageService.getAdminAccount();
-    const isUserMatch = !cleanUser || 
-                        cleanUser === primaryAccount.username.toLowerCase() || 
-                        cleanUser === 'admin';
+      if (adminData && adminData.passwordHash) {
+        const isPlainMatch = cleanPass === adminData.passwordHash;
+        const isHashMatch = await verifyPassword(cleanPass, adminData.passwordHash);
 
-    let isPassValid = false;
-    if (cleanPass === 'admin123' || cleanPass === '1' || cleanPass === primaryAccount.passwordHash) {
-      isPassValid = true;
-    } else {
-      isPassValid = await verifyPassword(cleanPass, primaryAccount.passwordHash);
-    }
+        if (isPlainMatch || isHashMatch) {
+          setIsAuthenticated(true);
+          try {
+            sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
+          } catch {}
+          setAuthError('');
+          return;
+        }
+      }
 
-    if (isUserMatch && isPassValid) {
-      setIsAuthenticated(true);
-      try {
-        sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
-      } catch {}
-      setAuthError('');
-    } else {
-      setAuthError('Invalid username or password.');
+      setAuthError('Invalid username or password. Please verify your database credentials.');
+    } catch (err) {
+      console.error('Login error:', err);
+      setAuthError('Database connection error. Please try again.');
     }
   };
 

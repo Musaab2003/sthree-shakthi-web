@@ -455,6 +455,29 @@ export const firebaseService = {
   },
 
   // 4. Admin Accounts Collection in Firestore
+  async getAdminByUsername(username: string): Promise<AdminAccount | null> {
+    const db = this.getDb();
+    if (!db || !username) return null;
+    try {
+      const cleanUser = username.trim().toLowerCase();
+      const docRef = doc(db, 'admins', cleanUser);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          username: cleanUser,
+          email: data.email || '',
+          passwordHash: data.passwordHash || data.password || '',
+          updatedAt: data.updatedAt || new Date().toISOString()
+        };
+      }
+      return null;
+    } catch (e) {
+      console.warn('Error fetching admin by username from Firestore:', e);
+      return null;
+    }
+  },
+
   async getAdmins(): Promise<AdminAccount[]> {
     const db = this.getDb();
     if (!db) return [];
