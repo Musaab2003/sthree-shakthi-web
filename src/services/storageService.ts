@@ -194,19 +194,12 @@ export const storageService = {
       }
     }
 
-    // Cache heavy fileData in memory and persist in IndexedDB and Firestore Chunks
+    // Cache heavy fileData in memory and persist in IndexedDB immediately
     if (pub.fileData) {
       fileDataMemoryCache.set(pubId, pub.fileData);
-      try {
-        await saveFileToIDB(pubId, pub.fileData);
-      } catch (e) {
-        console.warn('IDB save notice:', e);
-      }
-      try {
-        await firebaseService.savePublicationFileToFirestore(pubId, pub.fileData);
-      } catch (e) {
-        console.warn('Firestore chunk save notice:', e);
-      }
+      saveFileToIDB(pubId, pub.fileData).catch(() => {});
+      // Cloud chunk sync in background
+      firebaseService.savePublicationFileToFirestore(pubId, pub.fileData).catch(() => {});
     }
 
     const newPub: Publication = {
@@ -224,14 +217,9 @@ export const storageService = {
     all.unshift(newPub);
     safeSavePublications(all);
 
-    // Sync to Firebase Cloud directly and await result
+    // Sync metadata to Firebase Cloud immediately
     try {
-      const inserted = await firebaseService.insertPublication(newPub);
-      if (!inserted && newPub.fileData) {
-        // Fallback: If heavy payload hit network limits, insert metadata and embedUrl
-        const lightweightPub = { ...newPub, fileData: undefined };
-        await firebaseService.insertPublication(lightweightPub);
-      }
+      await firebaseService.insertPublication(newPub);
     } catch (err) {
       console.warn('Firebase Cloud publish error:', err);
     }

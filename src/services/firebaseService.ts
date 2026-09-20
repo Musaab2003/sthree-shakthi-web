@@ -113,11 +113,15 @@ export const firebaseService = {
     const storage = this.getStorage();
     if (!storage) return null;
     try {
-      const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const storageRef = ref(storage, `publications/${pubId}/${cleanFileName}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      return downloadUrl;
+      const uploadTask = (async () => {
+        const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const storageRef = ref(storage, `publications/${pubId}/${cleanFileName}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        return await getDownloadURL(snapshot.ref);
+      })();
+
+      const timeoutTask = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+      return await Promise.race([uploadTask, timeoutTask]);
     } catch (e) {
       console.warn('Firebase Storage upload notice:', e);
       return null;
@@ -266,8 +270,9 @@ export const firebaseService = {
         likes: Number(pub.likes) || 0,
         readTimeMinutes: Number(pub.readTimeMinutes) || 5
       };
-      await setDoc(docRef, cleanData, { merge: true });
-      return true;
+      const insertTask = setDoc(docRef, cleanData, { merge: true }).then(() => true);
+      const timeoutTask = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 4000));
+      return await Promise.race([insertTask, timeoutTask]);
     } catch (err) {
       console.error('Firebase insertPublication error:', err);
       return false;
@@ -360,8 +365,9 @@ export const firebaseService = {
         const chunkDocRef = doc(chunksCol, String(i).padStart(4, '0'));
         batchPromises.push(setDoc(chunkDocRef, { index: i, total: totalChunks, data: chunkStr }));
       }
-      await Promise.all(batchPromises);
-      return true;
+      const saveTask = Promise.all(batchPromises).then(() => true);
+      const timeoutTask = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+      return await Promise.race([saveTask, timeoutTask]);
     } catch (e) {
       console.warn('Firestore chunk save notice:', e);
       return false;
