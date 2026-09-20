@@ -1,26 +1,7 @@
-﻿function escapePdfText(text: string): string {
-  return text
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
-}
-
-function wrapText(text: string, maxCharsPerLine: number = 75): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let currentLine = '';
-
-  for (const word of words) {
-    if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
-      currentLine = (currentLine + ' ' + word).trim();
-    } else {
-      if (currentLine) lines.push(currentLine);
-      currentLine = word;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines;
-}
+﻿/**
+ * Exact-byte PDF 1.4 Binary Generator
+ * Generates standards-compliant valid PDF documents with exact xref offsets
+ */
 
 export function generatePublicationPdfBlob(pub: {
   title: string;
@@ -31,114 +12,101 @@ export function generatePublicationPdfBlob(pub: {
   content?: string;
   submittedAt?: string;
 }): Blob {
-  const title = pub.title || 'Untitled Publication';
-  const author = `Author: ${pub.authorName || 'Anonymous'}${pub.authorClub ? ` (${pub.authorClub})` : ''}`;
-  const dateStr = pub.submittedAt ? new Date(pub.submittedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString();
-  const summaryLines = wrapText(pub.summary || '', 70);
-  const contentLines = pub.content ? wrapText(pub.content, 75) : [];
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  const offsets: number[] = [];
 
-  const pageHeight = 792;
-  const pageWidth = 612;
-  const margin = 50;
+  const encoder = new TextEncoder();
 
-  let stream = '';
-  stream += `0.85 0.37 0.50 rg\n`;
-  stream += `${margin} ${pageHeight - 110} ${pageWidth - (margin * 2)} 40 re f\n`;
-  stream += `BT\n/F1 12 Tf\n1 1 1 rg\n${margin + 15} ${pageHeight - 95} Td\n(PROJECT STHREE SHAKTHI  |  ROTARACT DISTRICT 3220) Tj\nET\n`;
-  stream += `BT\n/F1 20 Tf\n0.24 0.06 0.16 rg\n${margin} ${pageHeight - 150} Td\n(${escapePdfText(title.slice(0, 60))}) Tj\nET\n`;
-  stream += `BT\n/F2 10 Tf\n0.40 0.40 0.40 rg\n${margin} ${pageHeight - 175} Td\n(${escapePdfText(author)}   |   Published: ${escapePdfText(dateStr)}) Tj\nET\n`;
-  stream += `0.80 0.80 0.80 RG\n1 w\n${margin} ${pageHeight - 190} m ${pageWidth - margin} ${pageHeight - 190} l S\n`;
-
-  let currentY = pageHeight - 225;
-  stream += `0.98 0.95 0.92 rg\n`;
-  const boxHeight = Math.max(60, summaryLines.length * 16 + 25);
-  stream += `${margin} ${currentY - boxHeight + 15} ${pageWidth - (margin * 2)} ${boxHeight} re f\n`;
-  stream += `0.85 0.37 0.50 RG\n1.5 w\n${margin} ${currentY - boxHeight + 15} ${pageWidth - (margin * 2)} ${boxHeight} re S\n`;
-  stream += `BT\n/F1 10 Tf\n0.55 0.10 0.25 rg\n${margin + 15} ${currentY - 5} Td\n(EXECUTIVE SUMMARY) Tj\nET\n`;
-  currentY -= 22;
-
-  for (const line of summaryLines) {
-    stream += `BT\n/F2 10 Tf\n0.20 0.20 0.20 rg\n${margin + 15} ${currentY} Td\n(${escapePdfText(line)}) Tj\nET\n`;
-    currentY -= 15;
+  function append(str: string) {
+    const bytes = encoder.encode(str);
+    chunks.push(bytes);
+    totalLength += bytes.length;
   }
 
-  currentY -= 30;
+  // Header with binary comment
+  append('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
 
-  if (contentLines.length > 0) {
-    stream += `BT\n/F1 12 Tf\n0.24 0.06 0.16 rg\n${margin} ${currentY} Td\n(DOCUMENT BODY) Tj\nET\n`;
-    currentY -= 20;
+  // Object 1: Catalog
+  offsets.push(totalLength);
+  append('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
 
-    for (const line of contentLines) {
-      if (currentY < margin + 40) break;
-      stream += `BT\n/F2 10 Tf\n0.15 0.15 0.15 rg\n${margin} ${currentY} Td\n(${escapePdfText(line)}) Tj\nET\n`;
-      currentY -= 15;
+  // Object 2: Pages Tree
+  offsets.push(totalLength);
+  append('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+
+  // Object 3: Page Definition (8.5 x 11 inches = 612 x 792 points)
+  offsets.push(totalLength);
+  append('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> /F2 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>\nendobj\n');
+
+  // Clean strings for PDF stream
+  const cleanTitle = (pub.title || 'Official Community Publication').replace(/[()\\\r\n]/g, ' ');
+  const cleanAuthor = `By ${pub.authorName || 'Anonymous'}${pub.authorClub ? ` (${pub.authorClub})` : ''}`.replace(/[()\\\r\n]/g, ' ');
+  const dateStr = pub.submittedAt ? new Date(pub.submittedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString();
+  const cleanSummary = (pub.summary || 'Official publication details.').replace(/[()\\\r\n]/g, ' ');
+  const cleanContent = (pub.content || '').replace(/[()\\\r\n]/g, ' ');
+
+  // Build PDF stream
+  let stream = '';
+  // Top Banner
+  stream += `0.85 0.37 0.50 rg\n50 710 512 36 re f\n`;
+  stream += `BT\n/F1 11 Tf\n1 1 1 rg\n65 723 Td\n(PROJECT STHREE SHAKTHI  |  ROTARACT DISTRICT 3220) Tj\nET\n`;
+
+  // Title
+  stream += `BT\n/F1 18 Tf\n0.24 0.06 0.16 rg\n50 670 Td\n(${cleanTitle.slice(0, 50)}) Tj\nET\n`;
+
+  // Author & Date
+  stream += `BT\n/F2 10 Tf\n0.40 0.40 0.40 rg\n50 650 Td\n(${cleanAuthor.slice(0, 50)}  |  Published: ${dateStr}) Tj\nET\n`;
+
+  // Divider
+  stream += `0.80 0.80 0.80 RG\n1 w\n50 635 m 562 635 l S\n`;
+
+  // Summary Header & Text
+  stream += `BT\n/F1 11 Tf\n0.55 0.10 0.25 rg\n50 605 Td\n(EXECUTIVE SUMMARY) Tj\nET\n`;
+  stream += `BT\n/F2 10 Tf\n0.20 0.20 0.20 rg\n50 585 Td\n(${cleanSummary.slice(0, 85)}) Tj\nET\n`;
+  if (cleanSummary.length > 85) {
+    stream += `BT\n/F2 10 Tf\n0.20 0.20 0.20 rg\n50 570 Td\n(${cleanSummary.slice(85, 170)}) Tj\nET\n`;
+  }
+
+  // Body content
+  if (cleanContent) {
+    stream += `BT\n/F1 11 Tf\n0.24 0.06 0.16 rg\n50 530 Td\n(PUBLICATION DETAILS) Tj\nET\n`;
+    stream += `BT\n/F2 10 Tf\n0.20 0.20 0.20 rg\n50 510 Td\n(${cleanContent.slice(0, 85)}) Tj\nET\n`;
+    if (cleanContent.length > 85) {
+      stream += `BT\n/F2 10 Tf\n0.20 0.20 0.20 rg\n50 495 Td\n(${cleanContent.slice(85, 170)}) Tj\nET\n`;
     }
   }
 
-  stream += `0.80 0.80 0.80 RG\n0.5 w\n${margin} 45 m ${pageWidth - margin} 45 l S\n`;
-  stream += `BT\n/F2 8 Tf\n0.50 0.50 0.50 rg\n${margin} 30 Td\n(Project Sthree Shakthi - Cluster 05 - Official Publication) Tj\nET\n`;
+  // Footer
+  stream += `0.80 0.80 0.80 RG\n0.5 w\n50 45 m 562 45 l S\n`;
+  stream += `BT\n/F2 8 Tf\n0.50 0.50 0.50 rg\n50 30 Td\n(Project Sthree Shakthi - Cluster 05 - Digital Document Reader) Tj\nET\n`;
 
-  const streamLength = stream.length;
+  const streamBytes = encoder.encode(stream);
 
-  const pdfContent = `%PDF-1.4
-1 0 obj
-<<
-  /Type /Catalog
-  /Pages 2 0 R
->>
-endobj
-2 0 obj
-<<
-  /Type /Pages
-  /Kids [3 0 R]
-  /Count 1
->>
-endobj
-3 0 obj
-<<
-  /Type /Page
-  /Parent 2 0 R
-  /MediaBox [0 0 ${pageWidth} ${pageHeight}]
-  /Resources <<
-    /Font <<
-      /F1 <<
-        /Type /Font
-        /Subtype /Type1
-        /BaseFont /Helvetica-Bold
-      >>
-      /F2 <<
-        /Type /Font
-        /Subtype /Type1
-        /BaseFont /Helvetica
-      >>
-    >>
-  >>
-  /Contents 4 0 R
->>
-endobj
-4 0 obj
-<<
-  /Length ${streamLength}
->>
-stream
-${stream}
-endstream
-endobj
-xref
-0 5
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000350 00000 n 
-trailer
-<<
-  /Size 5
-  /Root 1 0 R
->>
-startxref
-${400 + streamLength}
-%%EOF`;
+  // Object 4: Stream Data
+  offsets.push(totalLength);
+  append(`4 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n`);
+  chunks.push(streamBytes);
+  totalLength += streamBytes.length;
+  append('\nendstream\nendobj\n');
 
-  return new Blob([pdfContent], { type: 'application/pdf' });
+  // Cross-Reference Table
+  const startXref = totalLength;
+  append('xref\n0 5\n0000000000 65535 f \n');
+  for (const o of offsets) {
+    append(`${String(o).padStart(10, '0')} 00000 n \n`);
+  }
+
+  // Trailer
+  append(`trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`);
+
+  // Combine into single Uint8Array
+  const finalBuffer = new Uint8Array(totalLength);
+  let cur = 0;
+  for (const chunk of chunks) {
+    finalBuffer.set(chunk, cur);
+    cur += chunk.length;
+  }
+
+  return new Blob([finalBuffer], { type: 'application/pdf' });
 }
