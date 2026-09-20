@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   X, 
   User, 
@@ -55,24 +55,29 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | PublicationStatus | 'notifications'>('all');
 
+  const userEmail = currentUser?.email ? currentUser.email.trim().toLowerCase() : '';
+
+  // Memoize filtered publications by current user email for instant rendering
+  const userPubs = useMemo(() => {
+    if (!userEmail) return [];
+    return publications.filter(
+      p => (p.authorEmail || '').trim().toLowerCase() === userEmail
+    );
+  }, [publications, userEmail]);
+
+  const pendingPubs = useMemo(() => userPubs.filter(p => p.status === 'pending'), [userPubs]);
+  const approvedPubs = useMemo(() => userPubs.filter(p => p.status === 'approved'), [userPubs]);
+  const rejectedPubs = useMemo(() => userPubs.filter(p => p.status === 'rejected'), [userPubs]);
+
+  const unreadNotifsCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
+
+  const filteredPubs = useMemo(() => {
+    if (activeTab === 'all') return userPubs;
+    if (activeTab === 'notifications') return [];
+    return userPubs.filter(p => p.status === activeTab);
+  }, [userPubs, activeTab]);
+
   if (!isOpen || !currentUser) return null;
-
-  // Filter publications by current user email
-  const userPubs = publications.filter(
-    p => (p.authorEmail || '').trim().toLowerCase() === currentUser.email.trim().toLowerCase()
-  );
-
-  const pendingPubs = userPubs.filter(p => p.status === 'pending');
-  const approvedPubs = userPubs.filter(p => p.status === 'approved');
-  const rejectedPubs = userPubs.filter(p => p.status === 'rejected');
-
-  const unreadNotifsCount = notifications.filter(n => !n.read).length;
-
-  const filteredPubs = userPubs.filter(p => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'notifications') return false;
-    return p.status === activeTab;
-  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200">

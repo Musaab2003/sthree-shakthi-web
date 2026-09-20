@@ -249,6 +249,11 @@ export const storageService = {
     return { success: true, publication: newPub };
   },
 
+  // Fast sync lookup from in-memory cache
+  getPublicationFileDataSync(id: string): string | null {
+    return fileDataMemoryCache.get(id) || null;
+  },
+
   // Async helper to get full document file data
   async getPublicationFileData(id: string): Promise<string | null> {
     if (fileDataMemoryCache.has(id)) {

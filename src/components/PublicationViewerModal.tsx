@@ -8,7 +8,6 @@ import {
   FileType,
   Maximize2,
   Minimize2,
-  Download,
   Check
 } from 'lucide-react';
 import { Publication } from '../types';
@@ -78,9 +77,21 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       if (lastLoadedPubIdRef.current !== publication.id) {
         lastLoadedPubIdRef.current = publication.id;
 
-        if (publication.fileData && publication.fileData.length > 50) {
-          setLoadedFileData(publication.fileData);
+        const fastCached = (publication.fileData && publication.fileData.length > 50) 
+          ? publication.fileData 
+          : storageService.getPublicationFileDataSync(publication.id);
+
+        if (fastCached && fastCached.length > 50) {
+          setLoadedFileData(fastCached);
           setIsLoadingFile(false);
+        } else if (publication.embedUrl && publication.embedUrl.length > 5) {
+          // If embedUrl exists, start viewing immediately without a blocking spinner
+          setIsLoadingFile(false);
+          setLoadedFileData(null);
+          // Preload file data in background
+          storageService.getPublicationFileData(publication.id).then((data) => {
+            if (data) setLoadedFileData(data);
+          }).catch(() => {});
         } else {
           setIsLoadingFile(true);
           setLoadedFileData(null);
@@ -409,19 +420,9 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
             {effectiveDocUrl && (
               <a
                 href={effectiveDocUrl}
-                download={publication.fileName || `${publication.title}.${isWordType ? 'docx' : 'pdf'}`}
-                className="px-3.5 py-1.5 rounded-full bg-[#D95F7F] hover:bg-[#BE4465] text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs touch-manipulation cursor-pointer"
-              >
-                <Download className="w-3 h-3" />
-                <span>Download {isWordType ? 'Doc' : 'PDF'}</span>
-              </a>
-            )}
-            {effectiveDocUrl && (
-              <a
-                href={effectiveDocUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition-all flex items-center gap-1 touch-manipulation cursor-pointer"
+                className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition-all flex items-center gap-1.5 touch-manipulation cursor-pointer"
               >
                 <ExternalLink className="w-3 h-3" />
                 <span>Open in New Tab</span>
