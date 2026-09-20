@@ -181,34 +181,14 @@ export const storageService = {
   ): Promise<{ success: boolean; publication: Publication }> {
     const pubId = `pub-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
     
-    let finalEmbedUrl = pub.embedUrl;
-    
-    // If rawFile is provided, upload to Firebase Storage for direct high-speed cloud access
-    if (rawFile && pub.fileName) {
-      try {
-        const storageUrl = await firebaseService.uploadPublicationFile(rawFile, pubId, pub.fileName);
-        if (storageUrl) {
-          finalEmbedUrl = storageUrl;
-        }
-      } catch (e) {
-        console.warn('Firebase Storage upload fallback:', e);
-      }
-    }
-
-    // Cache heavy fileData in memory and persist in IndexedDB and Firebase Cloud Chunks
+    // 1. Instant local memory cache and IndexedDB storage (< 5ms)
     if (pub.fileData) {
       fileDataMemoryCache.set(pubId, pub.fileData);
       saveFileToIDB(pubId, pub.fileData).catch(() => {});
-      try {
-        await firebaseService.savePublicationFileToFirestore(pubId, pub.fileData);
-      } catch (e) {
-        console.warn('Firestore file chunk upload notice:', e);
-      }
     }
 
     const newPub: Publication = {
       ...pub,
-      embedUrl: finalEmbedUrl,
       id: pubId,
       status: 'pending',
       submittedAt: new Date().toISOString(),
@@ -217,16 +197,54 @@ export const storageService = {
       isFeatured: false
     };
 
+    // 2. Instant localStorage state update so Dashboard and UI update immediately
     const all = this.getAllPublications();
     all.unshift(newPub);
     safeSavePublications(all);
 
-    // Sync metadata to Firebase Cloud immediately
-    try {
-      await firebaseService.insertPublication(newPub);
-    } catch (err) {
-      console.warn('Firebase Cloud publish error:', err);
-    }
+    // 3. Fast Parallel Cloud Synchronization
+    const cloudSyncTask = async () => {
+      let finalEmbedUrl = pub.embedUrl;
+      
+      // Upload raw file in background if present
+      if (rawFile && pub.fileName) {
+        try {
+          const storageUrl = await firebaseService.uploadPublicationFile(rawFile, pubId, pub.fileName);
+          if (storageUrl) {
+            finalEmbedUrl = storageUrl;
+            newPub.embedUrl = storageUrl;
+          }
+        } catch (e) {
+          console.warn('Storage upload fallback:', e);
+        }
+      }
+
+      // Save main publication document to Firestore
+      try {
+        await firebaseService.insertPublication({
+          ...newPub,
+          embedUrl: finalEmbedUrl
+        });
+      } catch (err) {
+        console.warn('Firebase metadata upload notice:', err);
+      }
+
+      // Concurrently persist file chunks to Firestore in background
+      if (pub.fileData) {
+        try {
+          await firebaseService.savePublicationFileToFirestore(pubId, pub.fileData);
+        } catch (e) {
+          console.warn('Firestore file chunk upload notice:', e);
+        }
+      }
+    };
+
+    // Cap wait time to 1.2s max so the UI responds within ~1 second
+    const fastPromise = cloudSyncTask();
+    await Promise.race([
+      fastPromise,
+      new Promise(resolve => setTimeout(resolve, 1200))
+    ]);
 
     return { success: true, publication: newPub };
   },
