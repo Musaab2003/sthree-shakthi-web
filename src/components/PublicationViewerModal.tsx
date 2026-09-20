@@ -14,11 +14,15 @@ import {
   Layers,
   Maximize2,
   Minimize2,
-  Download
+  Download,
+  Upload,
+  Link2,
+  CheckCircle2
 } from 'lucide-react';
 import { Publication } from '../types';
 import { parseDocumentOrFlipbookUrl } from '../utils/embedHelper';
 import { storageService } from '../services/storageService';
+import { firebaseService } from '../services/firebaseService';
 
 interface PublicationViewerModalProps {
   publication: Publication | null;
@@ -39,6 +43,10 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const [likesCount, setLikesCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [fileUploadSuccessToast, setFileUploadSuccessToast] = useState(false);
 
   useEffect(() => {
     // Reset iframe load state when publication changes
@@ -47,6 +55,10 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
     setLikesCount(publication?.likes || 0);
     setHasLiked(publication ? storageService.hasUserLiked(publication.id) : false);
     setCopiedToast(false);
+    setFileUploadSuccessToast(false);
+    setIsUploadingFile(false);
+    setShowLinkInput(false);
+    setLinkInput(publication?.embedUrl || '');
 
     if (publication) {
       document.body.style.overflow = 'hidden';
@@ -154,6 +166,51 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
     setLikesCount(prev => currentlyLiked ? Math.max(0, prev - 1) : prev + 1);
     
     onLike(publication.id, e as React.MouseEvent);
+  };
+
+  const handleInlineFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingFile(true);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const dataUrl = event.target?.result as string;
+      setLoadedFileData(dataUrl);
+
+      let cloudUrl: string | null = null;
+      try {
+        cloudUrl = await firebaseService.uploadPublicationFile(file, publication.id, file.name);
+      } catch (err) {
+        console.warn('Firebase Storage upload notice:', err);
+      }
+
+      const updated: Publication = {
+        ...publication,
+        fileData: dataUrl,
+        fileName: file.name,
+        fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+        embedUrl: cloudUrl || publication.embedUrl || undefined
+      };
+
+      storageService.updatePublication(updated);
+      setIsUploadingFile(false);
+      setFileUploadSuccessToast(true);
+      setTimeout(() => setFileUploadSuccessToast(false), 3000);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveLink = () => {
+    if (!linkInput.trim()) return;
+    const updated: Publication = {
+      ...publication,
+      embedUrl: linkInput.trim()
+    };
+    storageService.updatePublication(updated);
+    setShowLinkInput(false);
+    setFileUploadSuccessToast(true);
+    setTimeout(() => setFileUploadSuccessToast(false), 3000);
   };
 
   const isWordType = publication.type === 'word' || 
@@ -592,30 +649,79 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                     })}
                   </div>
                 ) : (
-                  <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#F4E5DA] text-center space-y-4 shadow-2xs">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#D95F7F] flex items-center justify-center mx-auto">
-                      <BookOpen className="w-6 h-6" />
+                  <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#FAF2EB] via-white to-[#FFF5F8] border-2 border-dashed border-[#D95F7F]/40 text-center space-y-5 shadow-xs">
+                    <div className="w-16 h-16 rounded-3xl bg-rose-100 text-[#D95F7F] flex items-center justify-center mx-auto shadow-inner">
+                      <Upload className="w-8 h-8" />
                     </div>
-                    <div className="space-y-1 max-w-md mx-auto">
-                      <h4 className="font-serif text-base font-bold text-[#3E1028]">
-                        Complete Document Submitted
+                    <div className="space-y-1.5 max-w-lg mx-auto">
+                      <h4 className="font-serif text-lg sm:text-xl font-bold text-[#3E1028]">
+                        Open or Attach Document to Read
                       </h4>
-                      <p className="text-xs text-[#5C1D3B]/80 leading-relaxed">
-                        This work was submitted by <strong>{publication.authorName}</strong> as a comprehensive document publication.
+                      <p className="text-xs sm:text-sm text-[#5C1D3B]/80 leading-relaxed">
+                        To view and read the full document pages for <strong>"{publication.title}"</strong>, select your document file or connect a Google Drive link.
                       </p>
                     </div>
 
-                    {publication.embedUrl && (
-                      <div className="pt-2">
-                        <a
-                          href={publication.embedUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-md shadow-[#D95F7F]/20 transition-all hover:scale-102"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Open Full Document Online</span>
-                        </a>
+                    {fileUploadSuccessToast && (
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 animate-in fade-in">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Document loaded & synced successfully!</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                      <label className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full text-xs font-bold text-white bg-[#D95F7F] hover:bg-[#BE4465] shadow-lg shadow-[#D95F7F]/30 transition-all hover:scale-105 cursor-pointer touch-manipulation">
+                        {isUploadingFile ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Uploading & Loading Reader...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Select Document from Device to Read</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.docx,.doc,application/pdf"
+                          onChange={handleInlineFileUpload}
+                          disabled={isUploadingFile}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowLinkInput(!showLinkInput)}
+                        className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-full text-xs font-bold text-[#5C1D3B] hover:text-[#3E1028] bg-white hover:bg-slate-100 border border-[#F4E5DA] transition-all"
+                      >
+                        <Link2 className="w-4 h-4 text-[#D95F7F]" />
+                        <span>{showLinkInput ? 'Hide Link Option' : 'Attach Google Drive / Cloud Link'}</span>
+                      </button>
+                    </div>
+
+                    {showLinkInput && (
+                      <div className="pt-3 max-w-md mx-auto space-y-2 text-left animate-in fade-in">
+                        <label className="block text-[11px] font-bold text-[#3E1028]">
+                          Paste Google Drive, Flipbook, or Document Link:
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            placeholder="https://drive.google.com/file/d/..."
+                            value={linkInput}
+                            onChange={(e) => setLinkInput(e.target.value)}
+                            className="flex-grow px-3 py-2 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveLink}
+                            className="px-4 py-2 rounded-xl bg-[#D95F7F] hover:bg-[#BE4465] text-white text-xs font-bold transition-colors shrink-0"
+                          >
+                            Save & View
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
