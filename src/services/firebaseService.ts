@@ -343,17 +343,49 @@ export const firebaseService = {
     }
   },
 
+  async savePublicationFileToFirestore(pubId: string, fileData: string): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !fileData) return false;
+    try {
+      const CHUNK_SIZE = 450 * 1024; // 450 KB per chunk (guaranteed under Firestore 1MB document limit)
+      const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
+      const chunksCol = collection(db, 'publications', pubId, 'file_chunks');
+      
+      const batchPromises = [];
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkStr = fileData.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        const chunkDocRef = doc(chunksCol, String(i).padStart(4, '0'));
+        batchPromises.push(setDoc(chunkDocRef, { index: i, total: totalChunks, data: chunkStr }));
+      }
+      await Promise.all(batchPromises);
+      return true;
+    } catch (e) {
+      console.warn('Firestore chunk save notice:', e);
+      return false;
+    }
+  },
+
   async getPublicationFileData(id: string): Promise<string | null> {
     const db = this.getDb();
     if (!db) return null;
     try {
+      // 1. Try single doc field if small
       const docRef = doc(db, 'publications', id);
       const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        return snap.data()?.fileData || null;
+      if (snap.exists() && snap.data()?.fileData) {
+        return snap.data()?.fileData;
+      }
+
+      // 2. Query chunked document subcollection
+      const chunksCol = collection(db, 'publications', id, 'file_chunks');
+      const chunksSnap = await getDocs(query(chunksCol, orderBy('index', 'asc')));
+      if (!chunksSnap.empty) {
+        const fullBase64 = chunksSnap.docs.map(d => d.data()?.data || '').join('');
+        if (fullBase64) return fullBase64;
       }
       return null;
-    } catch {
+    } catch (e) {
+      console.warn('Firestore getPublicationFileData notice:', e);
       return null;
     }
   },

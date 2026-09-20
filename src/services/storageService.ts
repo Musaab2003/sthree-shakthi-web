@@ -193,6 +193,7 @@ export const storageService = {
     if (pub.fileData) {
       fileDataMemoryCache.set(pubId, pub.fileData);
       saveFileToIDB(pubId, pub.fileData);
+      firebaseService.savePublicationFileToFirestore(pubId, pub.fileData).catch(() => {});
     }
 
     const newPub: Publication = {
@@ -235,7 +236,7 @@ export const storageService = {
       fileDataMemoryCache.set(id, fromIdb);
       return fromIdb;
     }
-    // Fetch from Firebase Cloud on demand
+    // Fetch from Firebase Cloud chunked storage
     const fromCloud = await firebaseService.getPublicationFileData(id);
     if (fromCloud) {
       fileDataMemoryCache.set(id, fromCloud);

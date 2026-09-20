@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   ExternalLink, 
@@ -9,10 +9,7 @@ import {
   Maximize2,
   Minimize2,
   Download,
-  Check,
-  Upload,
-  FileCheck,
-  AlertCircle
+  Check
 } from 'lucide-react';
 import { Publication } from '../types';
 import { parseDocumentOrFlipbookUrl } from '../utils/embedHelper';
@@ -38,11 +35,6 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const [hasLiked, setHasLiked] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
-
-  // Attach state
-  const [isAttaching, setIsAttaching] = useState(false);
-  const [attachSuccessToast, setAttachSuccessToast] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setLoadedFileData(publication?.fileData || null);
@@ -134,35 +126,6 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
       publication.title.toLowerCase().endsWith('.doc')
     ));
 
-  // Handler for uploading/attaching document file
-  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsAttaching(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const dataUrl = event.target?.result as string;
-      const sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-      
-      setLoadedFileData(dataUrl);
-
-      await storageService.attachFileToPublication(
-        publication.id,
-        dataUrl,
-        file.name,
-        sizeStr,
-        undefined,
-        file
-      );
-
-      setIsAttaching(false);
-      setAttachSuccessToast(true);
-      setTimeout(() => setAttachSuccessToast(false), 3000);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleShareClick = async (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     const shareUrl = window.location.href;
@@ -210,16 +173,6 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-3 md:p-6">
-      
-      {/* Hidden File Input for attaching/replacing document */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileSelected}
-        accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        className="hidden"
-      />
-
       <div 
         className={`relative w-full flex flex-col overflow-hidden bg-slate-900 shadow-2xl transition-all duration-300 border border-[#F4E5DA] ${
           isFullScreen ? 'h-full w-full max-w-[1920px] rounded-none sm:rounded-3xl' : 'max-w-5xl h-[100dvh] sm:h-[92vh] rounded-none sm:rounded-[32px]'
@@ -231,14 +184,6 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
           <div className="absolute top-16 right-4 sm:right-6 z-50 px-4 py-2 rounded-2xl bg-[#3E1028] text-white text-xs font-bold shadow-xl border border-[#D95F7F] flex items-center gap-2 animate-in slide-in-from-top duration-200">
             <Check className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Link copied to clipboard!</span>
-          </div>
-        )}
-
-        {/* Toast: File Attached */}
-        {attachSuccessToast && (
-          <div className="absolute top-16 right-4 sm:right-6 z-50 px-4 py-2 rounded-2xl bg-emerald-700 text-white text-xs font-bold shadow-xl border border-emerald-400 flex items-center gap-2 animate-in slide-in-from-top duration-200">
-            <FileCheck className="w-4 h-4 text-white shrink-0" />
-            <span>PDF Document loaded successfully!</span>
           </div>
         )}
 
@@ -273,19 +218,6 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            
-            {/* Attach / Replace File Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isAttaching}
-              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 min-h-[36px] rounded-full text-xs font-bold text-[#3E1028] bg-white hover:bg-slate-100 border border-[#F4E5DA] shadow-2xs cursor-pointer touch-manipulation active:scale-95"
-              title="Upload or replace PDF file"
-            >
-              <Upload className="w-3.5 h-3.5 text-[#D95F7F]" />
-              <span className="hidden md:inline">{effectiveDocUrl ? 'Replace PDF' : 'Attach PDF'}</span>
-            </button>
-
             {publication.embedUrl && (
               <a
                 href={publication.embedUrl}
@@ -385,35 +317,21 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
               />
             </object>
           ) : (
-            /* Prompt to open the original PDF file */
-            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900 overflow-y-auto">
-              <div className="max-w-md w-full bg-slate-800/95 border border-slate-700 rounded-3xl p-8 space-y-6 shadow-2xl">
-                <div className="w-20 h-20 rounded-3xl bg-[#D95F7F]/20 border border-[#D95F7F]/40 text-[#D95F7F] flex items-center justify-center mx-auto shadow-inner">
-                  <FileText className="w-10 h-10" />
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-slate-900">
+              <div className="max-w-md w-full bg-slate-800/90 border border-slate-700 rounded-3xl p-8 space-y-4 shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-[#D95F7F]/20 border border-[#D95F7F]/40 text-[#D95F7F] flex items-center justify-center mx-auto">
+                  <FileText className="w-8 h-8" />
                 </div>
-
-                <div className="space-y-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950 text-rose-300 text-[11px] font-bold uppercase tracking-wider border border-rose-800">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    PDF Document File: {publication.fileName || `${publication.title}.pdf`}
-                  </span>
-                  <h3 className="font-serif text-2xl font-bold text-white pt-1">
-                    {publication.title}
-                  </h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Click the button below to load <strong>{publication.fileName || `${publication.title}.pdf`}</strong> into the interactive PDF reader.
-                  </p>
+                <h3 className="font-serif text-xl font-bold text-white">
+                  {publication.title}
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {publication.summary || 'Document details submitted by the author.'}
+                </p>
+                <div className="pt-2 text-[11px] text-slate-400">
+                  Author: <span className="text-slate-200 font-medium">{publication.authorName}</span>
+                  {publication.authorClub ? ` (${publication.authorClub})` : ''}
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isAttaching}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl bg-[#D95F7F] hover:bg-[#BE4465] text-white font-bold text-sm shadow-xl shadow-[#D95F7F]/30 transition-all hover:scale-102 cursor-pointer touch-manipulation active:scale-95"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>{isAttaching ? 'Loading PDF...' : `Open "${publication.fileName || `${publication.title}.pdf`}"`}</span>
-                </button>
               </div>
             </div>
           )}
@@ -429,7 +347,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
           </span>
           
           <div className="flex items-center gap-2">
-            {isAdminView && effectiveDocUrl && (
+            {effectiveDocUrl && (
               <a
                 href={effectiveDocUrl}
                 download={publication.fileName || `${publication.title}.${isWordType ? 'docx' : 'pdf'}`}
