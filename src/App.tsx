@@ -37,7 +37,9 @@ export function App() {
     // Cloud Synchronization for multi-device live submissions
     const performCloudSync = async () => {
       const { publications: syncedPubs } = await storageService.syncFromCloud();
-      if (syncedPubs) setAllPublications(syncedPubs);
+      if (syncedPubs) {
+        setAllPublications(storageService.rehydratePublicationsWithLocalFiles(syncedPubs));
+      }
     };
 
     // Initial sync
@@ -46,7 +48,7 @@ export function App() {
     // Attach real-time Firebase Firestore listener
     const unsubPubs = firebaseService.listenToPublications((livePubs) => {
       if (livePubs && Array.isArray(livePubs)) {
-        setAllPublications(livePubs);
+        setAllPublications(storageService.rehydratePublicationsWithLocalFiles(livePubs));
       }
     });
 

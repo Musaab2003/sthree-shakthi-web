@@ -49,8 +49,34 @@ function openIDB(): Promise<IDBDatabase> {
   });
 }
 
+async function preloadAllFilesFromIDB(): Promise<void> {
+  try {
+    const db = await openIDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const cursorReq = store.openCursor();
+    cursorReq.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        if (cursor.key && cursor.value) {
+          fileDataMemoryCache.set(String(cursor.key), cursor.value);
+        }
+        cursor.continue();
+      }
+    };
+  } catch (e) {
+    console.warn('IDB preloading notice:', e);
+  }
+}
+
+// Preload IndexedDB files into memory cache on boot
+if (typeof window !== 'undefined') {
+  preloadAllFilesFromIDB();
+}
+
 async function saveFileToIDB(id: string, fileData: string): Promise<void> {
   try {
+    fileDataMemoryCache.set(id, fileData);
     const db = await openIDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
@@ -61,13 +87,21 @@ async function saveFileToIDB(id: string, fileData: string): Promise<void> {
 }
 
 async function getFileFromIDB(id: string): Promise<string | null> {
+  if (fileDataMemoryCache.has(id)) {
+    return fileDataMemoryCache.get(id) || null;
+  }
   try {
     const db = await openIDB();
     return new Promise((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const req = store.get(id);
-      req.onsuccess = () => resolve(req.result || null);
+      req.onsuccess = () => {
+        if (req.result) {
+          fileDataMemoryCache.set(id, req.result);
+        }
+        resolve(req.result || null);
+      };
       req.onerror = () => resolve(null);
     });
   } catch {
@@ -78,6 +112,10 @@ async function getFileFromIDB(id: string): Promise<string | null> {
 function safeSavePublications(all: Publication[]) {
   try {
     const lightweightAll = all.map(p => {
+      if (p.fileData) {
+        fileDataMemoryCache.set(p.id, p.fileData);
+        saveFileToIDB(p.id, p.fileData);
+      }
       if (p.fileData && p.fileData.length > 50000) {
         const { fileData, ...rest } = p;
         return { ...rest, fileData: undefined };
@@ -91,6 +129,16 @@ function safeSavePublications(all: Publication[]) {
 }
 
 export const storageService = {
+  // Re-hydrate any list of publications with local in-memory/IDB file data
+  rehydratePublicationsWithLocalFiles(pubs: Publication[]): Publication[] {
+    return pubs.map(p => {
+      if (!p.fileData && fileDataMemoryCache.has(p.id)) {
+        return { ...p, fileData: fileDataMemoryCache.get(p.id) };
+      }
+      return p;
+    });
+  },
+
   // 1. Get all publications
   getAllPublications(): Publication[] {
     try {
@@ -101,12 +149,7 @@ export const storageService = {
       }
       const pubs: Publication[] = JSON.parse(data);
       // Re-hydrate with in-memory cached fileData if present
-      return pubs.map(p => {
-        if (!p.fileData && fileDataMemoryCache.has(p.id)) {
-          return { ...p, fileData: fileDataMemoryCache.get(p.id) };
-        }
-        return p;
-      });
+      return this.rehydratePublicationsWithLocalFiles(pubs);
     } catch (e) {
       console.error('Error reading publications from local storage', e);
       return [];
