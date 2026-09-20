@@ -251,7 +251,7 @@ export const firebaseService = {
         embedUrl: pub.embedUrl || null,
         fileName: pub.fileName || null,
         fileSize: pub.fileSize || null,
-        fileData: pub.fileData || null,
+        fileData: (pub.fileData && pub.fileData.length < 500000) ? pub.fileData : null,
         coverImage: pub.coverImage || '/campaign-poster.jpg',
         tags: pub.tags || [],
         status: pub.status || 'pending',
