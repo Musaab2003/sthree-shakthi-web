@@ -11,8 +11,9 @@ import { AdminPortal } from './components/AdminPortal';
 import { DatabaseSettingsModal } from './components/DatabaseSettingsModal';
 import { UserAuthModal } from './components/UserAuthModal';
 import { ContributorDashboard } from './components/ContributorDashboard';
+import { NotificationsModal } from './components/NotificationsModal';
 
-import { Publication, DatabaseConfig, UserAccount } from './types';
+import { Publication, DatabaseConfig, UserAccount, UserNotification } from './types';
 import { storageService } from './services/storageService';
 import { firebaseService } from './services/firebaseService';
 
@@ -25,6 +26,11 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalNotice, setAuthModalNotice] = useState('');
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [userNotifications, setUserNotifications] = useState<UserNotification[]>(() => {
+    const u = storageService.getCurrentUser();
+    return u?.email ? storageService.getNotifications(u.email) : [];
+  });
 
   // Modals state
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -116,6 +122,7 @@ export function App() {
   const handleUserAuthSuccess = (user: UserAccount) => {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
+    setUserNotifications(storageService.getNotifications(user.email));
     if (authModalNotice) {
       setAuthModalNotice('');
       setIsSubmitModalOpen(true);
@@ -125,7 +132,9 @@ export function App() {
   const handleUserLogout = () => {
     storageService.logoutUser();
     setCurrentUser(null);
+    setUserNotifications([]);
     setIsDashboardOpen(false);
+    setIsNotificationsModalOpen(false);
   };
 
   const handleOpenViewer = (pub: Publication) => {
@@ -161,12 +170,39 @@ export function App() {
     storageService.approvePublication(id);
     const updated = storageService.getAllPublications();
     setAllPublications(updated);
+    if (currentUser?.email) {
+      setUserNotifications(storageService.getNotifications(currentUser.email));
+    }
   };
 
   const handleReject = (id: string, reason?: string) => {
     storageService.rejectPublication(id, reason);
     const updated = storageService.getAllPublications();
     setAllPublications(updated);
+    if (currentUser?.email) {
+      setUserNotifications(storageService.getNotifications(currentUser.email));
+    }
+  };
+
+  const handleMarkNotificationAsRead = (id: string) => {
+    storageService.markNotificationAsRead(id);
+    if (currentUser?.email) {
+      setUserNotifications(storageService.getNotifications(currentUser.email));
+    }
+  };
+
+  const handleMarkAllNotificationsAsRead = () => {
+    if (currentUser?.email) {
+      storageService.markAllNotificationsAsRead(currentUser.email);
+      setUserNotifications(storageService.getNotifications(currentUser.email));
+    }
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    storageService.deleteNotification(id);
+    if (currentUser?.email) {
+      setUserNotifications(storageService.getNotifications(currentUser.email));
+    }
   };
 
   const handleToggleFeature = (id: string) => {
@@ -207,6 +243,8 @@ export function App() {
     }
   };
 
+  const unreadNotifsCount = userNotifications.filter(n => !n.read).length;
+
   return (
     <div className="min-h-screen flex flex-col selection:bg-[#D95F7F] selection:text-white bg-[#FDF9F6]">
       {/* Navigation Header */}
@@ -217,6 +255,8 @@ export function App() {
         currentUser={currentUser}
         onOpenAuthModal={() => { setAuthModalNotice(''); setIsAuthModalOpen(true); }}
         onOpenDashboard={() => setIsDashboardOpen(true)}
+        unreadNotificationsCount={unreadNotifsCount}
+        onOpenNotifications={() => setIsNotificationsModalOpen(true)}
       />
 
       {/* Main Content Sections */}
@@ -275,6 +315,25 @@ export function App() {
         onOpenViewer={handleOpenViewer}
         onLogout={handleUserLogout}
         onDeleteSubmission={handleDelete}
+        notifications={userNotifications}
+        onMarkNotificationAsRead={handleMarkNotificationAsRead}
+        onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
+        onDeleteNotification={handleDeleteNotification}
+      />
+
+      {/* Standalone Notifications Modal */}
+      <NotificationsModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        notifications={userNotifications}
+        onMarkAsRead={handleMarkNotificationAsRead}
+        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+        onDeleteNotification={handleDeleteNotification}
+        onOpenViewer={(pubId) => {
+          const p = allPublications.find(pub => pub.id === pubId);
+          if (p) handleOpenViewer(p);
+        }}
+        onOpenDashboard={() => setIsDashboardOpen(true)}
       />
 
       {/* Contributor Auth Modal (Register & Login) */}

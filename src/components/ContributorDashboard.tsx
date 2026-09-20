@@ -16,9 +16,12 @@ import {
   Trash2, 
   Sparkles,
   ExternalLink,
-  Heart
+  Heart,
+  Bell,
+  CheckCheck,
+  MessageSquareWarning
 } from 'lucide-react';
-import { Publication, UserAccount, PublicationStatus } from '../types';
+import { Publication, UserAccount, PublicationStatus, UserNotification } from '../types';
 import { storageService } from '../services/storageService';
 
 interface ContributorDashboardProps {
@@ -30,6 +33,10 @@ interface ContributorDashboardProps {
   onOpenViewer: (pub: Publication) => void;
   onLogout: () => void;
   onDeleteSubmission?: (id: string) => void;
+  notifications?: UserNotification[];
+  onMarkNotificationAsRead?: (id: string) => void;
+  onMarkAllNotificationsAsRead?: () => void;
+  onDeleteNotification?: (id: string) => void;
 }
 
 export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
@@ -40,9 +47,13 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
   onOpenSubmitModal,
   onOpenViewer,
   onLogout,
-  onDeleteSubmission
+  onDeleteSubmission,
+  notifications = [],
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onDeleteNotification
 }) => {
-  const [activeTab, setActiveTab] = useState<'all' | PublicationStatus>('all');
+  const [activeTab, setActiveTab] = useState<'all' | PublicationStatus | 'notifications'>('all');
 
   if (!isOpen || !currentUser) return null;
 
@@ -55,8 +66,11 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
   const approvedPubs = userPubs.filter(p => p.status === 'approved');
   const rejectedPubs = userPubs.filter(p => p.status === 'rejected');
 
+  const unreadNotifsCount = notifications.filter(n => !n.read).length;
+
   const filteredPubs = userPubs.filter(p => {
     if (activeTab === 'all') return true;
+    if (activeTab === 'notifications') return false;
     return p.status === activeTab;
   });
 
@@ -107,49 +121,72 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
         </div>
 
         {/* Overview Metric Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 sm:p-6 bg-white border-b border-[#F4E5DA]">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-4 sm:p-6 bg-white border-b border-[#F4E5DA]">
           <button 
             type="button"
             onClick={() => setActiveTab('all')}
-            className={`p-3.5 rounded-2xl border transition-all text-left ${
+            className={`p-3 rounded-2xl border transition-all text-left cursor-pointer ${
               activeTab === 'all' ? 'bg-[#FAF2EB] border-[#D95F7F] ring-2 ring-[#D95F7F]/20' : 'bg-[#FAF2EB]/40 border-[#F4E5DA]'
             }`}
           >
-            <div className="text-[10px] font-bold uppercase text-[#5C1D3B]/70">Total Submissions</div>
-            <div className="font-serif text-2xl font-bold text-[#3E1028] pt-1">{userPubs.length}</div>
+            <div className="text-[10px] font-bold uppercase text-[#5C1D3B]/70">Submissions</div>
+            <div className="font-serif text-xl sm:text-2xl font-bold text-[#3E1028] pt-1">{userPubs.length}</div>
           </button>
 
           <button 
             type="button"
             onClick={() => setActiveTab('approved')}
-            className={`p-3.5 rounded-2xl border transition-all text-left ${
+            className={`p-3 rounded-2xl border transition-all text-left cursor-pointer ${
               activeTab === 'approved' ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400/20' : 'bg-[#FAF2EB]/40 border-[#F4E5DA]'
             }`}
           >
-            <div className="text-[10px] font-bold uppercase text-emerald-800">Approved & Live</div>
-            <div className="font-serif text-2xl font-bold text-emerald-700 pt-1">{approvedPubs.length}</div>
+            <div className="text-[10px] font-bold uppercase text-emerald-800">Approved</div>
+            <div className="font-serif text-xl sm:text-2xl font-bold text-emerald-700 pt-1">{approvedPubs.length}</div>
           </button>
 
           <button 
             type="button"
             onClick={() => setActiveTab('pending')}
-            className={`p-3.5 rounded-2xl border transition-all text-left ${
+            className={`p-3 rounded-2xl border transition-all text-left cursor-pointer ${
               activeTab === 'pending' ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/20' : 'bg-[#FAF2EB]/40 border-[#F4E5DA]'
             }`}
           >
             <div className="text-[10px] font-bold uppercase text-amber-800">Under Review</div>
-            <div className="font-serif text-2xl font-bold text-amber-700 pt-1">{pendingPubs.length}</div>
+            <div className="font-serif text-xl sm:text-2xl font-bold text-amber-700 pt-1">{pendingPubs.length}</div>
           </button>
 
           <button 
             type="button"
             onClick={() => setActiveTab('rejected')}
-            className={`p-3.5 rounded-2xl border transition-all text-left ${
+            className={`p-3 rounded-2xl border transition-all text-left cursor-pointer ${
               activeTab === 'rejected' ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-400/20' : 'bg-[#FAF2EB]/40 border-[#F4E5DA]'
             }`}
           >
-            <div className="text-[10px] font-bold uppercase text-rose-800">Needs Changes</div>
-            <div className="font-serif text-2xl font-bold text-rose-700 pt-1">{rejectedPubs.length}</div>
+            <div className="text-[10px] font-bold uppercase text-rose-800">Needs Revision</div>
+            <div className="font-serif text-xl sm:text-2xl font-bold text-rose-700 pt-1">{rejectedPubs.length}</div>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => setActiveTab('notifications')}
+            className={`col-span-2 sm:col-span-1 p-3 rounded-2xl border transition-all text-left cursor-pointer relative ${
+              activeTab === 'notifications' ? 'bg-[#3E1028] text-white border-[#3E1028] ring-2 ring-[#3E1028]/20' : 'bg-white border-[#F4E5DA]'
+            }`}
+          >
+            <div className={`text-[10px] font-bold uppercase flex items-center justify-between ${activeTab === 'notifications' ? 'text-white/80' : 'text-[#5C1D3B]/80'}`}>
+              <span>Notifications</span>
+              <Bell className="w-3.5 h-3.5" />
+            </div>
+            <div className="flex items-center gap-1.5 pt-1">
+              <span className={`font-serif text-xl sm:text-2xl font-bold ${activeTab === 'notifications' ? 'text-white' : 'text-[#3E1028]'}`}>
+                {notifications.length}
+              </span>
+              {unreadNotifsCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black">
+                  {unreadNotifsCount} new
+                </span>
+              )}
+            </div>
           </button>
         </div>
 
@@ -158,7 +195,7 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'all'
                   ? 'bg-[#3E1028] text-white'
                   : 'bg-white text-[#5C1D3B] hover:bg-slate-100 border border-[#F4E5DA]'
@@ -168,7 +205,7 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('approved')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'approved'
                   ? 'bg-emerald-600 text-white'
                   : 'bg-white text-[#5C1D3B] hover:bg-slate-100 border border-[#F4E5DA]'
@@ -178,7 +215,7 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'pending'
                   ? 'bg-amber-600 text-white'
                   : 'bg-white text-[#5C1D3B] hover:bg-slate-100 border border-[#F4E5DA]'
@@ -188,13 +225,27 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('rejected')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'rejected'
                   ? 'bg-rose-600 text-white'
                   : 'bg-white text-[#5C1D3B] hover:bg-slate-100 border border-[#F4E5DA]'
               }`}
             >
               Rejected ({rejectedPubs.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                activeTab === 'notifications'
+                  ? 'bg-[#D95F7F] text-white'
+                  : 'bg-white text-[#5C1D3B] hover:bg-slate-100 border border-[#F4E5DA]'
+              }`}
+            >
+              <Bell className="w-3 h-3" />
+              <span>Notifications ({notifications.length})</span>
+              {unreadNotifsCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-rose-500" />
+              )}
             </button>
           </div>
 
@@ -210,9 +261,132 @@ export const ContributorDashboard: React.FC<ContributorDashboardProps> = ({
           </button>
         </div>
 
-        {/* Submissions List */}
+        {/* Content Body: Notifications Tab vs Submissions List */}
         <div className="flex-grow overflow-y-auto p-4 sm:p-6 space-y-4 bg-[#FDF9F6]">
-          {filteredPubs.length > 0 ? (
+          {activeTab === 'notifications' ? (
+            /* Notifications Tab Content */
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-serif text-sm sm:text-base font-bold text-[#3E1028]">
+                    Editorial Notifications & Feedback
+                  </h3>
+                  {unreadNotifsCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-extrabold">
+                      {unreadNotifsCount} unread
+                    </span>
+                  )}
+                </div>
+
+                {unreadNotifsCount > 0 && onMarkAllNotificationsAsRead && (
+                  <button
+                    type="button"
+                    onClick={onMarkAllNotificationsAsRead}
+                    className="flex items-center gap-1 px-3 py-1 rounded-full bg-white text-[#5C1D3B] hover:text-[#D95F7F] text-xs font-bold border border-[#F4E5DA] shadow-2xs transition-all cursor-pointer"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Mark all read</span>
+                  </button>
+                )}
+              </div>
+
+              {notifications.length > 0 ? (
+                notifications.map((notif) => {
+                  const isRejection = notif.type === 'rejection';
+                  const isApproval = notif.type === 'approval';
+
+                  return (
+                    <div
+                      key={notif.id}
+                      onClick={() => !notif.read && onMarkNotificationAsRead && onMarkNotificationAsRead(notif.id)}
+                      className={`p-4 sm:p-5 rounded-3xl bg-white border shadow-xs transition-all space-y-3 ${
+                        notif.read
+                          ? 'border-[#F4E5DA]'
+                          : isRejection
+                          ? 'border-rose-300 ring-1 ring-rose-300/40 bg-rose-50/20'
+                          : 'border-emerald-300 ring-1 ring-emerald-300/40 bg-emerald-50/20'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isRejection
+                              ? 'bg-rose-100 text-rose-800'
+                              : isApproval
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-100 text-slate-800'
+                          }`}>
+                            ● {isRejection ? 'Revision Required' : isApproval ? 'Approved & Live' : 'System Notice'}
+                          </span>
+
+                          {!notif.read && (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-bold">
+                              New
+                            </span>
+                          )}
+
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(notif.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                          </span>
+                        </div>
+
+                        {onDeleteNotification && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteNotification(notif.id);
+                            }}
+                            className="p-1 rounded-xl text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete notification"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="font-serif text-base font-bold text-[#3E1028]">
+                          {notif.title}
+                        </h4>
+                        <p className="text-xs text-[#5C1D3B]/80 leading-relaxed">
+                          {notif.message}
+                        </p>
+                      </div>
+
+                      {/* Editorial Rejection Reason Callout */}
+                      {isRejection && notif.feedbackReason && (
+                        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                            <MessageSquareWarning className="w-4 h-4 text-rose-600 shrink-0" />
+                            <span>Editorial Feedback from Cluster 05 Admin:</span>
+                          </div>
+                          <p className="italic text-slate-700 bg-white/80 p-2.5 rounded-xl border border-rose-200">
+                            "{notif.feedbackReason}"
+                          </p>
+                          <div className="pt-1 text-[11px] text-rose-700">
+                            👉 You can revise and resubmit your document anytime using the <strong>Submit New Blog</strong> button.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-16 px-4 bg-white rounded-3xl border border-[#F4E5DA] space-y-3">
+                  <div className="w-14 h-14 rounded-2xl bg-[#FAF2EB] text-[#D95F7F] flex items-center justify-center mx-auto shadow-inner">
+                    <Bell className="w-7 h-7 opacity-60" />
+                  </div>
+                  <h4 className="font-serif text-base font-bold text-[#3E1028]">
+                    No Notifications Yet
+                  </h4>
+                  <p className="text-xs text-[#5C1D3B]/70 max-w-sm mx-auto">
+                    When the editorial board reviews, approves, or provides revision notes on your submissions, they will appear here.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : filteredPubs.length > 0 ? (
             filteredPubs.map((pub) => (
               <div
                 key={pub.id}

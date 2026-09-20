@@ -1,4 +1,4 @@
-import { Publication, PublicationStatus, DatabaseConfig, AdminAccount, UserAccount } from '../types';
+import { Publication, PublicationStatus, DatabaseConfig, AdminAccount, UserAccount, UserNotification } from '../types';
 import { INITIAL_PUBLICATIONS } from '../data/initialPublications';
 import { firebaseService, DEFAULT_FIREBASE_CONFIG } from './firebaseService';
 import { hashPassword, verifyPassword } from '../utils/crypto';
@@ -10,6 +10,7 @@ const ADMIN_ACCOUNT_KEY = 'sthree_shakthi_admin_account_v1';
 const USER_LIKES_KEY = 'sthree_shakthi_user_likes_v1';
 const USER_SESSION_KEY = 'sthree_shakthi_current_user_v1';
 const ALL_USERS_KEY = 'sthree_shakthi_all_users_v1';
+const NOTIFICATIONS_KEY = 'sthree_shakthi_user_notifications_v1';
 
 const DEFAULT_ADMIN: AdminAccount = {
   username: 'admin',
@@ -255,10 +256,25 @@ export const storageService = {
     const all = this.getAllPublications();
     const index = all.findIndex(p => p.id === id);
     if (index !== -1) {
-      all[index].status = 'approved';
-      all[index].approvedAt = new Date().toISOString();
+      const pub = all[index];
+      pub.status = 'approved';
+      pub.approvedAt = new Date().toISOString();
       safeSavePublications(all);
       firebaseService.updatePublicationStatus(id, 'approved').catch(() => {});
+
+      // Dispatch approval notification to contributor
+      if (pub.authorEmail) {
+        this.createNotification({
+          userId: pub.authorId,
+          userEmail: pub.authorEmail.trim().toLowerCase(),
+          type: 'approval',
+          title: 'Publication Approved & Published! 🎉',
+          message: `Your publication "${pub.title}" has been approved by the editorial team and is now live on the public feed.`,
+          publicationId: pub.id,
+          publicationTitle: pub.title
+        });
+      }
+
       return true;
     }
     return false;
@@ -269,10 +285,26 @@ export const storageService = {
     const all = this.getAllPublications();
     const index = all.findIndex(p => p.id === id);
     if (index !== -1) {
-      all[index].status = 'rejected';
-      all[index].rejectedReason = reason || 'Does not match editorial criteria.';
+      const pub = all[index];
+      pub.status = 'rejected';
+      pub.rejectedReason = reason || 'Does not match editorial criteria.';
       safeSavePublications(all);
       firebaseService.updatePublicationStatus(id, 'rejected', reason).catch(() => {});
+
+      // Dispatch rejection notification with feedback reason to contributor
+      if (pub.authorEmail) {
+        this.createNotification({
+          userId: pub.authorId,
+          userEmail: pub.authorEmail.trim().toLowerCase(),
+          type: 'rejection',
+          title: 'Publication Revision Required',
+          message: `Your publication "${pub.title}" was reviewed by the editorial team and requires revisions.`,
+          publicationId: pub.id,
+          publicationTitle: pub.title,
+          feedbackReason: reason || 'Does not match editorial criteria.'
+        });
+      }
+
       return true;
     }
     return false;
@@ -748,10 +780,112 @@ export const storageService = {
         localStorage.setItem(ALL_USERS_KEY, JSON.stringify(currentUsers));
       }
 
+      // 5. Sync remote notifications from Firebase Cloud Firestore
+      const currentUser = this.getCurrentUser();
+      if (currentUser?.email) {
+        const remoteNotifs = await firebaseService.getUserNotifications(currentUser.email);
+        if (remoteNotifs && remoteNotifs.length > 0) {
+          const localNotifs = this.getNotifications();
+          const notifMap = new Map<string, UserNotification>();
+          remoteNotifs.forEach(n => notifMap.set(n.id, n));
+          localNotifs.forEach(n => {
+            if (!notifMap.has(n.id)) notifMap.set(n.id, n);
+          });
+          const merged = Array.from(notifMap.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(merged));
+        }
+      }
+
       return { publications: currentPubs, subscribers: currentSubs, admins: currentAdmins, users: currentUsers };
     } catch (err) {
       console.warn('Cloud sync background note:', err);
       return { publications: this.getAllPublications(), subscribers: this.getSubscribers(), admins: this.getAllAdmins(), users: this.getAllUsers() };
     }
+  },
+
+  // 17. User Notification Management
+  getNotifications(userEmail?: string): UserNotification[] {
+    try {
+      const data = localStorage.getItem(NOTIFICATIONS_KEY);
+      if (!data) return [];
+      const list: UserNotification[] = JSON.parse(data);
+      if (userEmail) {
+        const clean = userEmail.trim().toLowerCase();
+        return list.filter(n => (n.userEmail || '').trim().toLowerCase() === clean);
+      }
+      return list;
+    } catch (e) {
+      console.warn('Error fetching notifications:', e);
+      return [];
+    }
+  },
+
+  createNotification(notifData: Omit<UserNotification, 'id' | 'createdAt' | 'read'>): UserNotification {
+    const all = this.getNotifications();
+    const newNotif: UserNotification = {
+      ...notifData,
+      id: `NOTIF-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    all.unshift(newNotif);
+    try {
+      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all));
+    } catch (e) {
+      console.warn('Error saving notification locally:', e);
+    }
+
+    firebaseService.saveNotification(newNotif).catch(() => {});
+    return newNotif;
+  },
+
+  markNotificationAsRead(id: string): void {
+    const all = this.getNotifications();
+    const index = all.findIndex(n => n.id === id);
+    if (index !== -1) {
+      all[index].read = true;
+      try {
+        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all));
+      } catch (e) {
+        console.warn('Error updating notification read status:', e);
+      }
+      firebaseService.updateNotificationReadStatus(id, true).catch(() => {});
+    }
+  },
+
+  markAllNotificationsAsRead(userEmail: string): void {
+    const all = this.getNotifications();
+    const clean = userEmail.trim().toLowerCase();
+    all.forEach(n => {
+      if ((n.userEmail || '').trim().toLowerCase() === clean) {
+        n.read = true;
+        firebaseService.updateNotificationReadStatus(n.id, true).catch(() => {});
+      }
+    });
+    try {
+      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all));
+    } catch (e) {
+      console.warn('Error updating all notifications read status:', e);
+    }
+  },
+
+  deleteNotification(id: string): void {
+    let all = this.getNotifications();
+    all = all.filter(n => n.id !== id);
+    try {
+      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all));
+    } catch (e) {
+      console.warn('Error deleting notification locally:', e);
+    }
+    firebaseService.deleteNotification(id).catch(() => {});
+  },
+
+  getUnreadNotificationsCount(userEmail: string): number {
+    if (!userEmail) return 0;
+    const list = this.getNotifications(userEmail);
+    return list.filter(n => !n.read).length;
   }
 };

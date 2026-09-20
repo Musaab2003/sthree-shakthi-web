@@ -16,7 +16,7 @@ import {
   Unsubscribe 
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, FirebaseStorage } from 'firebase/storage';
-import { Publication, PublicationStatus, FirebaseConfig, AdminAccount, UserAccount } from '../types';
+import { Publication, PublicationStatus, FirebaseConfig, AdminAccount, UserAccount, UserNotification } from '../types';
 
 const STORAGE_KEY = 'sthree_shakthi_firebase_config_v1';
 
@@ -687,6 +687,70 @@ export const firebaseService = {
     } catch (e) {
       console.warn('Error fetching users from Firestore:', e);
       return [];
+    }
+  },
+
+  // 12. Notification Operations
+  async saveNotification(notif: UserNotification): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !notif.id) return false;
+    try {
+      await setDoc(doc(db, 'user_notifications', notif.id), {
+        ...notif,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return true;
+    } catch (e) {
+      console.warn('Error saving notification in Firestore:', e);
+      return false;
+    }
+  },
+
+  async getUserNotifications(email: string): Promise<UserNotification[]> {
+    const db = this.getDb();
+    if (!db || !email) return [];
+    try {
+      const snap = await getDocs(collection(db, 'user_notifications'));
+      if (snap.empty) return [];
+      const cleanEmail = email.trim().toLowerCase();
+      const list: UserNotification[] = [];
+      snap.docs.forEach(d => {
+        const data = d.data() as UserNotification;
+        if ((data.userEmail || '').trim().toLowerCase() === cleanEmail) {
+          list.push({ ...data, id: data.id || d.id });
+        }
+      });
+      return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (e) {
+      console.warn('Error fetching user notifications from Firestore:', e);
+      return [];
+    }
+  },
+
+  async updateNotificationReadStatus(id: string, read: boolean): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !id) return false;
+    try {
+      await updateDoc(doc(db, 'user_notifications', id), {
+        read,
+        updatedAt: new Date().toISOString()
+      });
+      return true;
+    } catch (e) {
+      console.warn('Error updating notification read status in Firestore:', e);
+      return false;
+    }
+  },
+
+  async deleteNotification(id: string): Promise<boolean> {
+    const db = this.getDb();
+    if (!db || !id) return false;
+    try {
+      await deleteDoc(doc(db, 'user_notifications', id));
+      return true;
+    } catch (e) {
+      console.warn('Error deleting notification from Firestore:', e);
+      return false;
     }
   }
 };

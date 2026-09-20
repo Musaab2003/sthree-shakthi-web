@@ -89,3 +89,18 @@ export interface UserAccount {
   updatedAt?: string;
 }
 
+export interface UserNotification {
+  id: string;
+  userId?: string;
+  userEmail: string;
+  type: 'rejection' | 'approval' | 'system';
+  title: string;
+  message: string;
+  publicationId: string;
+  publicationTitle: string;
+  feedbackReason?: string;
+  read: boolean;
+  createdAt: string;
+}
+
+

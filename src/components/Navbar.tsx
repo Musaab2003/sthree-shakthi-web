@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { 
   PlusCircle, 
   Menu, 
-  X,
-  User,
-  LayoutDashboard,
-  LogIn
+  X, 
+  User, 
+  LayoutDashboard, 
+  LogIn,
+  Bell
 } from 'lucide-react';
 import { UserAccount } from '../types';
 
@@ -16,6 +17,8 @@ interface NavbarProps {
   currentUser?: UserAccount | null;
   onOpenAuthModal: () => void;
   onOpenDashboard: () => void;
+  unreadNotificationsCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -25,6 +28,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onOpenAuthModal,
   onOpenDashboard,
+  unreadNotificationsCount = 0,
+  onOpenNotifications,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -103,8 +108,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </nav>
 
-          {/* Action CTAs: Submit Blog + User Profile / Login */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Action CTAs: Submit Blog + User Profile / Login + Notifications */}
+          <div className="hidden md:flex items-center gap-2.5">
+            {currentUser && onOpenNotifications && (
+              <button
+                type="button"
+                onClick={onOpenNotifications}
+                className="relative h-10 w-10 flex items-center justify-center rounded-full bg-white hover:bg-[#FAF2EB] border border-[#F4E5DA] shadow-2xs transition-all text-[#5C1D3B] hover:text-[#D95F7F] cursor-pointer"
+                title="View Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs animate-pulse">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {currentUser ? (
               <button
                 type="button"
@@ -142,6 +163,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Mobile menu trigger */}
           <div className="flex md:hidden items-center gap-2">
+            {currentUser && onOpenNotifications && (
+              <button
+                onClick={onOpenNotifications}
+                className="relative w-9 h-9 flex items-center justify-center rounded-full bg-white text-[#5C1D3B] border border-[#F4E5DA] shadow-2xs cursor-pointer"
+                title="Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-rose-500 text-white text-[8px] font-black flex items-center justify-center">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {currentUser ? (
               <button
                 onClick={onOpenDashboard}
