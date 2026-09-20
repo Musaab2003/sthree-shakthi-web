@@ -357,16 +357,22 @@ export const firebaseService = {
     try {
       const CHUNK_SIZE = 450 * 1024; // 450 KB per chunk (guaranteed under Firestore 1MB document limit)
       const totalChunks = Math.ceil(fileData.length / CHUNK_SIZE);
-      const chunksCol = collection(db, 'publications', pubId, 'file_chunks');
+      const subchunksCol = collection(db, 'publications', pubId, 'file_chunks');
+      const topchunksCol = collection(db, 'publication_file_chunks');
       
       const batchPromises = [];
       for (let i = 0; i < totalChunks; i++) {
         const chunkStr = fileData.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        const chunkDocRef = doc(chunksCol, String(i).padStart(4, '0'));
-        batchPromises.push(setDoc(chunkDocRef, { index: i, total: totalChunks, data: chunkStr }));
+        const chunkId = String(i).padStart(4, '0');
+        const chunkData = { index: i, total: totalChunks, pubId, data: chunkStr, updatedAt: new Date().toISOString() };
+        
+        // 1. Subcollection document
+        batchPromises.push(setDoc(doc(subchunksCol, chunkId), chunkData));
+        // 2. Top-level collection document
+        batchPromises.push(setDoc(doc(topchunksCol, `${pubId}_${chunkId}`), chunkData));
       }
       const saveTask = Promise.all(batchPromises).then(() => true);
-      const timeoutTask = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+      const timeoutTask = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 20000));
       return await Promise.race([saveTask, timeoutTask]);
     } catch (e) {
       console.warn('Firestore chunk save notice:', e);
@@ -376,22 +382,50 @@ export const firebaseService = {
 
   async getPublicationFileData(id: string): Promise<string | null> {
     const db = this.getDb();
-    if (!db) return null;
+    if (!db || !id) return null;
     try {
-      // 1. Try single doc field if small
+      // 1. Try single doc field if present
       const docRef = doc(db, 'publications', id);
       const snap = await getDoc(docRef);
-      if (snap.exists() && snap.data()?.fileData) {
+      if (snap.exists() && snap.data()?.fileData && snap.data()?.fileData.length > 50) {
         return snap.data()?.fileData;
       }
 
-      // 2. Query chunked document subcollection
-      const chunksCol = collection(db, 'publications', id, 'file_chunks');
-      const chunksSnap = await getDocs(query(chunksCol, orderBy('index', 'asc')));
-      if (!chunksSnap.empty) {
-        const fullBase64 = chunksSnap.docs.map(d => d.data()?.data || '').join('');
-        if (fullBase64) return fullBase64;
+      // 2. Query chunked document subcollection without index dependency
+      try {
+        const subchunksCol = collection(db, 'publications', id, 'file_chunks');
+        const chunksSnap = await getDocs(subchunksCol);
+        if (!chunksSnap.empty) {
+          const sortedDocs = chunksSnap.docs.slice().sort((a, b) => {
+            const idxA = typeof a.data()?.index === 'number' ? a.data().index : parseInt(a.id, 10) || 0;
+            const idxB = typeof b.data()?.index === 'number' ? b.data().index : parseInt(b.id, 10) || 0;
+            return idxA - idxB;
+          });
+          const fullBase64 = sortedDocs.map(d => d.data()?.data || '').join('');
+          if (fullBase64 && fullBase64.length > 50) return fullBase64;
+        }
+      } catch (subErr) {
+        console.warn('Subcollection chunk fetch fallback:', subErr);
       }
+
+      // 3. Fallback: Query top-level chunks collection doc by doc
+      try {
+        let chunkIdx = 0;
+        let combined = '';
+        while (chunkIdx < 30) {
+          const chunkId = `${id}_${String(chunkIdx).padStart(4, '0')}`;
+          const chunkDocSnap = await getDoc(doc(db, 'publication_file_chunks', chunkId));
+          if (!chunkDocSnap.exists()) break;
+          combined += chunkDocSnap.data()?.data || '';
+          chunkIdx++;
+        }
+        if (combined && combined.length > 50) {
+          return combined;
+        }
+      } catch (topErr) {
+        console.warn('Top-level chunk fetch notice:', topErr);
+      }
+
       return null;
     } catch (e) {
       console.warn('Firestore getPublicationFileData notice:', e);

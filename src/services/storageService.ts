@@ -191,12 +191,15 @@ export const storageService = {
       }
     }
 
-    // Cache heavy fileData in memory and persist in IndexedDB immediately
+    // Cache heavy fileData in memory and persist in IndexedDB and Firebase Cloud Chunks
     if (pub.fileData) {
       fileDataMemoryCache.set(pubId, pub.fileData);
       saveFileToIDB(pubId, pub.fileData).catch(() => {});
-      // Cloud chunk sync in background
-      firebaseService.savePublicationFileToFirestore(pubId, pub.fileData).catch(() => {});
+      try {
+        await firebaseService.savePublicationFileToFirestore(pubId, pub.fileData);
+      } catch (e) {
+        console.warn('Firestore file chunk upload notice:', e);
+      }
     }
 
     const newPub: Publication = {
