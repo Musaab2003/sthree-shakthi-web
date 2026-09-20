@@ -704,6 +704,20 @@ export const firebaseService = {
     }
   },
 
+  async deleteAllUsers(): Promise<{ count: number; success: boolean }> {
+    const db = this.getDb();
+    if (!db) return { count: 0, success: false };
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const deletions = snap.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletions);
+      return { count: snap.docs.length, success: true };
+    } catch (e) {
+      console.warn('Firebase deleteAllUsers error:', e);
+      return { count: 0, success: false };
+    }
+  },
+
   async purgeSampleDataFromCloud(): Promise<{ deletedCount: number; message: string }> {
     const db = this.getDb();
     if (!db) return { deletedCount: 0, message: 'Database not connected' };

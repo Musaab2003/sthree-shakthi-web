@@ -8,8 +8,8 @@ const DB_CONFIG_KEY = 'sthree_shakthi_db_config_v2';
 const SUBSCRIBERS_KEY = 'sthree_shakthi_subscribers_v1';
 const ADMIN_ACCOUNT_KEY = 'sthree_shakthi_admin_account_v1';
 const USER_LIKES_KEY = 'sthree_shakthi_user_likes_v1';
-const USER_SESSION_KEY = 'sthree_shakthi_current_user_v1';
-const ALL_USERS_KEY = 'sthree_shakthi_all_users_v1';
+const USER_SESSION_KEY = 'sthree_shakthi_current_user_v2';
+const ALL_USERS_KEY = 'sthree_shakthi_all_users_v2';
 const NOTIFICATIONS_KEY = 'sthree_shakthi_user_notifications_v1';
 
 const DEFAULT_ADMIN: AdminAccount = {
@@ -676,6 +676,18 @@ export const storageService = {
     let all = this.getAllUsers().filter(u => u.email.toLowerCase() !== cleanEmail);
     localStorage.setItem(ALL_USERS_KEY, JSON.stringify(all));
     return await firebaseService.deleteUser(cleanEmail);
+  },
+
+  async clearAllUsers(): Promise<{ count: number; success: boolean }> {
+    try {
+      localStorage.removeItem(ALL_USERS_KEY);
+      localStorage.removeItem(USER_SESSION_KEY);
+      const result = await firebaseService.deleteAllUsers();
+      return result;
+    } catch (e) {
+      console.warn('clearAllUsers error:', e);
+      return { count: 0, success: false };
+    }
   },
 
   async syncAllUsersToCloud(): Promise<void> {

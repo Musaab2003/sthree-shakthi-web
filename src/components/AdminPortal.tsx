@@ -194,6 +194,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  const handleClearAllUsers = async () => {
+    if (!window.confirm('⚠️ DELETE ALL REGISTERED USERS\n\nThis will permanently delete ALL contributor accounts from Firebase Cloud Firestore and reset all user sessions.\n\nAre you sure you want to proceed?')) {
+      return;
+    }
+    setUserOpNotice('Deleting all registered users from Firebase Firestore...');
+    try {
+      const res = await storageService.clearAllUsers();
+      setRegisteredUsers([]);
+      setUserOpNotice(`✅ Successfully deleted all ${res.count} user accounts from Firebase.`);
+      setTimeout(() => setUserOpNotice(''), 4000);
+    } catch (e: any) {
+      setUserOpNotice(`⚠️ Error deleting users: ${e?.message || 'Failed'}`);
+    }
+  };
+
   const handlePurgeSampleData = async () => {
     if (!window.confirm('⚠️ PURGE SAMPLE DATA\n\nThis will scan and permanently remove all sample publications, mock test articles, and dummy records from Firebase Firestore and local storage.\n\nReal contributor submissions and registered accounts will be preserved.\n\nProceed?')) {
       return;
@@ -1263,7 +1278,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleClearAllUsers}
+                        className="px-4 py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Delete All Users</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={handleSyncAllUsersToCloud}
