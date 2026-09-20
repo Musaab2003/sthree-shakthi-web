@@ -51,16 +51,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-[#FDF9F6]/95 backdrop-blur-md border-b border-[#F4E5DA]/80 transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+      <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20 sm:h-22 gap-4 lg:gap-8">
           
-          {/* Logo Brand with Authentic Logos */}
+          {/* Logo Brand with Authentic Logos (Positioned towards left side) */}
           <div 
             onClick={() => handleNavClick('hero')} 
-            className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-3 sm:gap-4 cursor-pointer group select-none shrink-0"
           >
             {/* Sthree Shakthi Logo */}
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-transparent flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl overflow-hidden bg-transparent flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <img src="/logo.png" alt="Sthree Shakthi Logo" className="w-full h-full object-contain" />
             </div>
 
@@ -69,27 +69,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[#3E1028] italic leading-none">
                 Sthree <span className="text-[#D95F7F] not-italic font-normal">Shakthi</span>
               </span>
-              <span className="text-[8.5px] sm:text-[9.5px] uppercase tracking-widest text-[#9E324F] font-bold mt-1 leading-none">
+              <span className="text-[8.5px] sm:text-[10px] uppercase tracking-widest text-[#9E324F] font-bold mt-1 leading-none">
                 Cluster 05 • District 3220
               </span>
             </div>
 
             {/* Clean Divider */}
-            <div className="hidden lg:block h-8 w-[1.5px] bg-[#D95F7F]/25 mx-2" />
+            <div className="hidden lg:block h-9 w-[1.5px] bg-[#D95F7F]/25 mx-2" />
 
-            {/* Partner Logo 1: Together Sri Lanka */}
-            <div className="hidden lg:flex items-center h-10 shrink-0 group-hover:scale-105 transition-transform" title="Together Sri Lanka">
-              <img src="/together-sl-logo.png" alt="Together Sri Lanka Logo" className="h-full w-auto object-contain max-h-9" />
+            {/* Partner Logo 1: Together Sri Lanka (Enlarged) */}
+            <div className="hidden lg:flex items-center h-12 sm:h-13 shrink-0 group-hover:scale-105 transition-transform" title="Together Sri Lanka">
+              <img src="/together-sl-logo.png" alt="Together Sri Lanka Logo" className="h-full w-auto object-contain max-h-12 sm:max-h-13" />
             </div>
 
-            {/* Partner Logo 2: Rotaract */}
-            <div className="hidden lg:flex items-center h-8 shrink-0 group-hover:scale-105 transition-transform" title="Rotaract District 3220">
-              <img src="/rotaract-logo.png" alt="Rotaract Logo" className="h-full w-auto object-contain max-h-7" />
+            {/* Partner Logo 2: Rotaract (Enlarged) */}
+            <div className="hidden lg:flex items-center h-10 sm:h-12 shrink-0 group-hover:scale-105 transition-transform" title="Rotaract District 3220">
+              <img src="/rotaract-logo.png" alt="Rotaract Logo" className="h-full w-auto object-contain max-h-10 sm:max-h-12" />
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+          <nav className="hidden md:flex items-center gap-5 lg:gap-8 shrink-0">
             {navLinks.map((link) => {
               const isActive = activeSection === link.id;
               return (
@@ -256,13 +256,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               Submit Blog
             </button>
 
-            {/* Partner Logos in Mobile Drawer */}
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <div className="flex items-center justify-center p-2 rounded-2xl bg-white border border-[#F4E5DA] shadow-2xs">
-                <img src="/together-sl-logo.png" alt="Together Sri Lanka" className="h-9 w-auto object-contain" />
+            {/* Partner Logos in Mobile Drawer (Enlarged) */}
+            <div className="flex items-center justify-center gap-5 pt-3">
+              <div className="flex items-center justify-center p-2.5 rounded-2xl bg-white border border-[#F4E5DA] shadow-2xs">
+                <img src="/together-sl-logo.png" alt="Together Sri Lanka" className="h-11 w-auto object-contain" />
               </div>
-              <div className="flex items-center justify-center p-2 rounded-2xl bg-white border border-[#F4E5DA] shadow-2xs">
-                <img src="/rotaract-logo.png" alt="Rotaract District 3220" className="h-7 w-auto object-contain" />
+              <div className="flex items-center justify-center p-2.5 rounded-2xl bg-white border border-[#F4E5DA] shadow-2xs">
+                <img src="/rotaract-logo.png" alt="Rotaract District 3220" className="h-9 w-auto object-contain" />
               </div>
             </div>
           </div>
