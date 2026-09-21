@@ -1,8 +1,56 @@
 ﻿rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+    
+    // 1. Publications Collection
+    match /publications/{publicationId} {
+      allow read: if true;
+      allow create: if request.resource.data.title is string
+                    && request.resource.data.authorName is string
+                    && request.resource.data.category is string;
+      allow update: if request.resource.data.title is string;
+      allow delete: if true;
+    }
+
+    // 2. Publication Files / Chunks Collection
+    match /publication_files/{chunkId} {
       allow read, write: if true;
+    }
+
+    // 3. Registered Contributor Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.email is string;
+      allow delete: if true;
+    }
+
+    // 4. Admin Accounts Collection
+    match /admins/{adminId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.username is string;
+      allow delete: if true;
+    }
+
+    // 5. Email OTP Verification Collection
+    match /email_otps/{otpId} {
+      allow read, write: if true;
+    }
+
+    // 6. Newsletter Subscribers Collection
+    match /newsletter_subscribers/{subscriberId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.email is string;
+      allow delete: if true;
+    }
+
+    // 7. User Notifications Collection
+    match /user_notifications/{notificationId} {
+      allow read, write: if true;
+    }
+
+    // 8. Block all other unauthorized access
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
