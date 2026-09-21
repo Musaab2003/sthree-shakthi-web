@@ -32,8 +32,6 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
   const [authorEmail, setAuthorEmail] = useState(() => currentUser?.email || '');
   const [authorClub, setAuthorClub] = useState(() => currentUser?.club || '');
   const [summary, setSummary] = useState('');
-  const [embedUrl, setEmbedUrl] = useState('');
-  const [content, setContent] = useState('');
 
   // Update prefill when user changes or modal opens
   React.useEffect(() => {
@@ -49,7 +47,6 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
   const [fileData, setFileData] = useState<string>('');
-  const [fileSourceMode, setFileSourceMode] = useState<'upload' | 'link'>('upload');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -65,7 +62,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
 
     // Check size (< 25MB)
     if (file.size > 25 * 1024 * 1024) {
-      alert('File size exceeds 25MB limit. Please upload a smaller file or provide a cloud link.');
+      alert('File size exceeds 25MB limit. Please upload a smaller PDF file.');
       return;
     }
 
@@ -113,12 +110,8 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
       return;
     }
 
-    if (fileSourceMode === 'upload' && !fileName) {
+    if (!fileName) {
       alert('Please select a PDF (.pdf) document to upload.');
-      return;
-    }
-    if (fileSourceMode === 'link' && !embedUrl.trim()) {
-      alert('Please provide a valid document link.');
       return;
     }
 
@@ -145,16 +138,13 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
         authorEmail: authorEmail.trim(),
         authorClub: authorClub.trim() || undefined,
         category: 'story',
-        type,
+        type: 'pdf',
         summary: summary.trim(),
-        content: content.trim() || undefined,
-        embedUrl: embedUrl.trim() || undefined,
         fileName: fileName || undefined,
         fileSize: fileSize || undefined,
         fileData: finalFileData || undefined,
         coverImage: DEFAULT_COVER,
-        tags: ['SthreeShakthi', 'Cluster05'],
-        readTimeMinutes: Math.max(3, Math.ceil((content.length || summary.length) / 200) + 2)
+        tags: ['SthreeShakthi', 'Cluster05']
       }, rawFile);
 
       setSubmissionId(generatedId);
@@ -174,8 +164,6 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     setAuthorEmail('');
     setAuthorClub('');
     setSummary('');
-    setEmbedUrl('');
-    setContent('');
     setRawFile(null);
     setFileName('');
     setFileSize('');
@@ -260,86 +248,56 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                     <span>Upload PDF Document (.pdf)</span>
                     <span className="text-[#D95F7F]">*</span>
                   </label>
-                  <div className="flex items-center gap-1 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setFileSourceMode('upload')}
-                      className={`px-2.5 py-1 rounded-full font-bold cursor-pointer transition-all ${
-                        fileSourceMode === 'upload' ? 'bg-[#D95F7F] text-white' : 'text-[#5C1D3B] hover:bg-slate-100'
-                      }`}
-                    >
-                      File Upload
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFileSourceMode('link')}
-                      className={`px-2.5 py-1 rounded-full font-bold cursor-pointer transition-all ${
-                        fileSourceMode === 'link' ? 'bg-[#D95F7F] text-white' : 'text-[#5C1D3B] hover:bg-slate-100'
-                      }`}
-                    >
-                      Cloud Link
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-semibold text-[#D95F7F] bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100">
+                    Required PDF
+                  </span>
                 </div>
 
-                {fileSourceMode === 'upload' ? (
-                  <div>
-                    {fileName ? (
-                      <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF2EB] border border-[#F4E5DA]">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-[#D95F7F] text-white flex items-center justify-center font-bold text-xs">
-                            PDF
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-[#3E1028] line-clamp-1">{fileName}</div>
-                            <div className="text-[10px] text-emerald-700 font-semibold">{fileSize} • Valid PDF ready for upload</div>
-                          </div>
+                <div>
+                  {fileName ? (
+                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF2EB] border border-[#F4E5DA]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#D95F7F] text-white flex items-center justify-center font-bold text-xs">
+                          PDF
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleClearFile}
-                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          title="Remove file"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div>
+                          <div className="text-xs font-bold text-[#3E1028] line-clamp-1">{fileName}</div>
+                          <div className="text-[10px] text-emerald-700 font-semibold">{fileSize} • Valid PDF ready for upload</div>
+                        </div>
                       </div>
-                    ) : (
-                      <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-[#F4E5DA] hover:border-[#D95F7F] rounded-2xl p-6 text-center cursor-pointer bg-[#FAF2EB]/40 hover:bg-[#FAF2EB] transition-all space-y-2 group"
+                      <button
+                        type="button"
+                        onClick={handleClearFile}
+                        className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        title="Remove file"
                       >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".pdf,application/pdf"
-                          onChange={handleFileChange}
-                          className="hidden"
-                        />
-                        <div className="w-10 h-10 rounded-full bg-white text-[#D95F7F] group-hover:scale-110 transition-transform flex items-center justify-center mx-auto shadow-2xs">
-                          <Upload className="w-5 h-5" />
-                        </div>
-                        <div className="text-xs font-bold text-[#3E1028]">
-                          Click to select your PDF document (.pdf)
-                        </div>
-                        <div className="text-[10px] text-[#5C1D3B]/60">
-                          Supports PDF files up to 25MB with high-speed rendering
-                        </div>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-[#F4E5DA] hover:border-[#D95F7F] rounded-2xl p-6 text-center cursor-pointer bg-[#FAF2EB]/40 hover:bg-[#FAF2EB] transition-all space-y-2 group"
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <div className="w-10 h-10 rounded-full bg-white text-[#D95F7F] group-hover:scale-110 transition-transform flex items-center justify-center mx-auto shadow-2xs">
+                        <Upload className="w-5 h-5" />
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    <input
-                      type="url"
-                      placeholder="https://drive.google.com/file/d/... or https://onedrive.live.com/..."
-                      value={embedUrl}
-                      onChange={(e) => setEmbedUrl(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
-                    />
-                    <span className="text-[10px] text-[#5C1D3B]/70">Make sure permissions are set to Anyone with link can view.</span>
-                  </div>
-                )}
+                      <div className="text-xs font-bold text-[#3E1028]">
+                        Click to select your PDF document (.pdf)
+                      </div>
+                      <div className="text-[10px] text-[#5C1D3B]/60">
+                        Supports PDF files up to 25MB with high-speed rendering
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Title & Subtitle */}
@@ -429,23 +387,6 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
-                />
-              </div>
-
-              {/* Full Blog / Story Text */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#3E1028]">
-                    Blog Story / Article Body <span className="text-slate-400 font-normal">(Optional for documents)</span>
-                  </label>
-                  <span className="text-[10px] text-[#5C1D3B]/70">Supports Markdown & Paragraphs</span>
-                </div>
-                <textarea
-                  rows={6}
-                  placeholder="Paste or write the full text of your blog/article here so visitors can read it directly online..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30 leading-relaxed font-sans"
                 />
               </div>
 
