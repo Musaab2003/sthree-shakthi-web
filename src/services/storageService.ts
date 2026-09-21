@@ -9,8 +9,8 @@ const DB_CONFIG_KEY = 'sthree_shakthi_db_config_v2';
 const SUBSCRIBERS_KEY = 'sthree_shakthi_subscribers_v1';
 const ADMIN_ACCOUNT_KEY = 'sthree_shakthi_admin_account_v1';
 const USER_LIKES_KEY = 'sthree_shakthi_user_likes_v1';
-const USER_SESSION_KEY = 'sthree_shakthi_current_user_v2';
-const ALL_USERS_KEY = 'sthree_shakthi_all_users_v2';
+const USER_SESSION_KEY = 'sthree_shakthi_current_user_v3';
+const ALL_USERS_KEY = 'sthree_shakthi_all_users_v3';
 const NOTIFICATIONS_KEY = 'sthree_shakthi_user_notifications_v1';
 
 const DEFAULT_ADMIN: AdminAccount = {
@@ -858,7 +858,7 @@ export const storageService = {
 
     // Save locally and persist to Firebase Cloud Firestore
     this.saveUserAccount(newUser);
-    await firebaseService.saveUser(newUser).catch(() => {});
+    await firebaseService.saveUser(newUser);
 
     return { success: true, user: newUser };
   },
