@@ -354,11 +354,12 @@ export const firebaseService = {
     try {
       const docRef = doc(db, 'publications', id);
       await deleteDoc(docRef);
-      // Clean up chunk documents in parallel
+      // Clean up chunk documents in parallel from both publication_files and publications
       const chunkDeletions = [];
       for (let i = 0; i < 30; i++) {
-        const chunkDocRef = doc(db, 'publications', `chunk-${id}-${String(i).padStart(4, '0')}`);
-        chunkDeletions.push(deleteDoc(chunkDocRef).catch(() => {}));
+        const chunkId = `chunk-${id}-${String(i).padStart(4, '0')}`;
+        chunkDeletions.push(deleteDoc(doc(db, 'publication_files', chunkId)).catch(() => {}));
+        chunkDeletions.push(deleteDoc(doc(db, 'publications', chunkId)).catch(() => {}));
       }
       await Promise.all(chunkDeletions);
       return true;
@@ -380,34 +381,16 @@ export const firebaseService = {
         const chunkStr = fileData.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
         const chunkId = `chunk-${pubId}-${String(i).padStart(4, '0')}`;
         
-        // Save as valid publication document in permitted publications collection
+        // Save in dedicated publication_files collection so root publications collection remains clean
         const chunkDocData = {
-          title: 'FILE_CHUNK',
-          subtitle: null,
-          authorName: 'System',
-          authorEmail: 'system@cluster05.org',
-          authorClub: null,
-          category: 'story',
-          type: 'pdf',
-          summary: `Chunk ${i} of ${totalChunks} for ${pubId}`,
-          content: pubId,
-          embedUrl: null,
-          fileName: chunkId,
-          fileSize: null,
+          pubId: pubId,
+          chunkIndex: i,
+          totalChunks: totalChunks,
           fileData: chunkStr,
-          coverImage: '/campaign-poster.jpg',
-          tags: ['FILE_CHUNK', pubId],
-          status: 'approved',
-          isFeatured: false,
-          submittedAt: new Date().toISOString(),
-          approvedAt: null,
-          rejectedReason: null,
-          views: 0,
-          likes: 0,
-          readTimeMinutes: 0
+          createdAt: new Date().toISOString()
         };
 
-        batchPromises.push(setDoc(doc(db, 'publications', chunkId), chunkDocData));
+        batchPromises.push(setDoc(doc(db, 'publication_files', chunkId), chunkDocData));
       }
 
       // Also record chunkCount on main document
@@ -437,11 +420,11 @@ export const firebaseService = {
 
         const count = Number(data?.chunkCount) || 0;
         if (count > 0) {
-          // Parallel fetch all known chunks simultaneously in 1 network burst
+          // Parallel fetch all known chunks from publication_files
           const chunkPromises = [];
           for (let i = 0; i < count; i++) {
             const chunkId = `chunk-${id}-${String(i).padStart(4, '0')}`;
-            chunkPromises.push(getDoc(doc(db, 'publications', chunkId)));
+            chunkPromises.push(getDoc(doc(db, 'publication_files', chunkId)));
           }
           const chunkSnaps = await Promise.all(chunkPromises);
           let combined = '';
@@ -456,11 +439,16 @@ export const firebaseService = {
         }
       }
 
-      // 2. Fallback: Fast parallel batch fetch of first 12 chunks
+      // 2. Fallback: Fast parallel batch fetch from publication_files or legacy publications
       const batchPromises = [];
       for (let i = 0; i < 12; i++) {
         const chunkId = `chunk-${id}-${String(i).padStart(4, '0')}`;
-        batchPromises.push(getDoc(doc(db, 'publications', chunkId)));
+        batchPromises.push(
+          getDoc(doc(db, 'publication_files', chunkId)).then(async (s) => {
+            if (s.exists()) return s;
+            return getDoc(doc(db, 'publications', chunkId));
+          })
+        );
       }
       const chunkSnaps = await Promise.all(batchPromises);
       let combined = '';
