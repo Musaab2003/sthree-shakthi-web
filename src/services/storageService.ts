@@ -1,6 +1,7 @@
-import { Publication, PublicationStatus, DatabaseConfig, AdminAccount, UserAccount, UserNotification } from '../types';
+import { Publication, PublicationStatus, DatabaseConfig, AdminAccount, UserAccount, UserNotification, EmailConfig } from '../types';
 import { INITIAL_PUBLICATIONS } from '../data/initialPublications';
 import { firebaseService, DEFAULT_FIREBASE_CONFIG } from './firebaseService';
+import { emailService } from './emailService';
 import { hashPassword, verifyPassword } from '../utils/crypto';
 
 const STORAGE_KEY = 'sthree_shakthi_publications_v3';
@@ -746,7 +747,7 @@ export const storageService = {
       return { success: false, message: 'An account with this email address already exists. Please sign in.' };
     }
 
-    // Generate 6-digit numeric OTP
+    // Generate 6-digit unique numeric OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
@@ -756,14 +757,27 @@ export const storageService = {
       localStorage.setItem(`sthree_otp_${cleanEmail}`, JSON.stringify({ otp: otpCode, expiresAt }));
     } catch (e) {}
 
-    // Dispatch notification / email relay
-    console.info(`[Sthree Shakthi Auth] Verification OTP for ${cleanEmail}: ${otpCode}`);
+    // Dispatch OTP email directly to user's Gmail / Inbox
+    const emailResult = await emailService.sendOtpEmail({
+      toEmail: cleanEmail,
+      toName: cleanName,
+      otp: otpCode
+    });
+
+    console.info(`[Sthree Shakthi Auth] Verification OTP dispatched to ${cleanEmail}`);
 
     return { 
       success: true, 
-      otp: otpCode, 
-      message: `A 6-digit verification code has been sent to ${cleanEmail}.` 
+      message: emailResult.message || `A 6-digit verification code has been sent to ${cleanEmail}. Please check your inbox and spam folder.` 
     };
+  },
+
+  getEmailConfig(): EmailConfig {
+    return emailService.getEmailConfig();
+  },
+
+  saveEmailConfig(config: EmailConfig): void {
+    emailService.saveEmailConfig(config);
   },
 
   async verifyRegistrationOtp(

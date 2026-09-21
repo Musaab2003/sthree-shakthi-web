@@ -103,4 +103,15 @@ export interface UserNotification {
   createdAt: string;
 }
 
+export interface EmailConfig {
+  provider: 'web3forms' | 'emailjs' | 'smtp' | 'custom';
+  web3formsAccessKey?: string;
+  emailjsServiceId?: string;
+  emailjsTemplateId?: string;
+  emailjsPublicKey?: string;
+  senderEmail?: string;
+  senderName?: string;
+}
+
+
 

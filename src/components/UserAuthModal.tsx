@@ -45,7 +45,6 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
   // OTP Verification Fields
   const [otpCode, setOtpCode] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
-  const [demoOtpHint, setDemoOtpHint] = useState<string | null>(null);
 
   // Login Fields
   const [loginEmail, setLoginEmail] = useState('');
@@ -110,11 +109,10 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
     try {
       const res = await storageService.sendRegistrationOtp(regEmail, regName);
       if (res.success) {
-        setDemoOtpHint(res.otp || null);
         setMode('otp_verify');
         setOtpCode('');
         setResendTimer(60);
-        setSuccessMsg(`A 6-digit verification code has been sent to ${regEmail.trim().toLowerCase()}.`);
+        setSuccessMsg(`A 6-digit verification code has been dispatched to ${regEmail.trim().toLowerCase()}. Please check your Gmail/Inbox.`);
       } else {
         setErrorMsg(res.message || 'Failed to send verification code. Please try again.');
       }
@@ -135,9 +133,8 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
     try {
       const res = await storageService.sendRegistrationOtp(regEmail, regName);
       if (res.success) {
-        setDemoOtpHint(res.otp || null);
         setResendTimer(60);
-        setSuccessMsg(`A new 6-digit verification code has been sent to ${regEmail}.`);
+        setSuccessMsg(`A new 6-digit verification code has been dispatched to ${regEmail}. Please check your inbox and spam folder.`);
       } else {
         setErrorMsg(res.message || 'Could not resend code.');
       }
@@ -180,7 +177,6 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
         setRegName('');
         setRegClub('');
         setOtpCode('');
-        setDemoOtpHint(null);
       } else {
         setErrorMsg(regRes.message || 'Registration failed. Please try again.');
       }
@@ -470,18 +466,12 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
                   />
                 </div>
 
-                {demoOtpHint && (
-                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
-                    <span>Verification Code: <strong className="font-mono text-xs">{demoOtpHint}</strong></span>
-                    <button
-                      type="button"
-                      onClick={() => setOtpCode(demoOtpHint)}
-                      className="px-2 py-0.5 rounded-md bg-amber-200/80 hover:bg-amber-300 font-bold text-[10px] cursor-pointer"
-                    >
-                      Fill Code
-                    </button>
-                  </div>
-                )}
+                <div className="p-3 rounded-xl bg-[#FAF2EB]/80 border border-[#F4E5DA] text-[11px] text-[#5C1D3B]/80 flex items-start gap-2 leading-relaxed">
+                  <Mail className="w-4 h-4 text-[#D95F7F] shrink-0 mt-0.5" />
+                  <span>
+                    A unique 6-digit verification code was sent to <strong className="text-[#3E1028]">{regEmail}</strong>. Please check your Gmail / Inbox (and Spam/Junk folder) and enter it above.
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center justify-between text-xs px-1">
