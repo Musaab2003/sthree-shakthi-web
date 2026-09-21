@@ -14,21 +14,21 @@ async function toArrayBuffer(input: string | Blob): Promise<ArrayBuffer> {
   }
   
   if (typeof input === 'string') {
-    if (input.startsWith('data:') || input.includes(';base64,')) {
-      const base64Data = input.includes(';base64,') ? input.split(';base64,')[1] : input.split(',')[1] || input;
-      const cleanBase64 = base64Data.replace(/[\r\n\s]/g, '');
-      const binaryString = atob(cleanBase64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      return bytes.buffer;
+    if (input.startsWith('blob:') || input.startsWith('http://') || input.startsWith('https://')) {
+      const response = await fetch(input);
+      return await response.arrayBuffer();
     }
 
-    // Fetch URL
-    const response = await fetch(input);
-    return await response.arrayBuffer();
+    // Base64 string (with or without data: URI header)
+    const base64Data = input.includes(';base64,') ? input.split(';base64,')[1] : (input.startsWith('data:') ? input.split(',')[1] : input);
+    const cleanBase64 = base64Data.replace(/[\r\n\s]/g, '');
+    const binaryString = atob(cleanBase64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
   }
 
   throw new Error('Unsupported document data format');

@@ -61,7 +61,7 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(true);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const lastLoadedPubIdRef = React.useRef<string | null>(null);
 
@@ -241,10 +241,10 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#3E1028]/85 backdrop-blur-md animate-in fade-in duration-200 p-0 sm:p-3 md:p-6">
+    <div className={`fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-200 ${isFullScreen ? 'p-0' : 'p-0 sm:p-3 md:p-6'}`}>
       <div 
         className={`relative w-full flex flex-col overflow-hidden bg-slate-900 shadow-2xl transition-all duration-300 border border-[#F4E5DA] ${
-          isFullScreen ? 'h-full w-full max-w-[1920px] rounded-none sm:rounded-3xl' : 'max-w-5xl h-[100dvh] sm:h-[92vh] rounded-none sm:rounded-[32px]'
+          isFullScreen ? 'fixed inset-0 w-screen h-screen rounded-none' : 'max-w-6xl h-[100dvh] sm:h-[92vh] rounded-none sm:rounded-[32px]'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
