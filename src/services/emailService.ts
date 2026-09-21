@@ -3,12 +3,14 @@
 
 import { EmailConfig } from '../types';
 
-const EMAIL_CONFIG_KEY = 'sthree_shakthi_email_config_v1';
+const EMAIL_CONFIG_KEY = 'sthree_shakthi_email_config_v2';
 
-// Default public relay keys for instant delivery
+// Configured EmailJS keys for live Gmail OTP delivery
 const DEFAULT_EMAIL_CONFIG: EmailConfig = {
-  provider: 'web3forms',
-  web3formsAccessKey: '9e7a8df8-22eb-4d5a-9694-df8b1a329971',
+  provider: 'emailjs',
+  emailjsServiceId: 'service_2lmtfpo',
+  emailjsTemplateId: 'template_tj99v7k',
+  emailjsPublicKey: 'OZAVMJtZAps40kban',
   senderName: 'Sthree Shakthi',
   senderEmail: 'notifications@sthreeshakthi.org'
 };
