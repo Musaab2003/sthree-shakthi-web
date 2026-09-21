@@ -1281,7 +1281,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                 </>
                               )}
                               <span>•</span>
-                              <span>{pub.fileSize || `${pub.readTimeMinutes} min read`}</span>
+                              <span>{pub.fileSize || (pub.type === 'word' ? 'Word Document' : 'PDF Document')}</span>
                               <span>•</span>
                               <span>{new Date(pub.submittedAt).toLocaleDateString()}</span>
                             </div>

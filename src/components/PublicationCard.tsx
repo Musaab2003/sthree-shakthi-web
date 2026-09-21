@@ -5,7 +5,6 @@ import {
   ExternalLink, 
   Eye, 
   Heart, 
-  Clock, 
   Sparkles,
   Share2
 } from 'lucide-react';
@@ -112,22 +111,14 @@ export const PublicationCard: React.FC<PublicationCardProps> = ({
           )}
         </div>
 
-        {/* Read Time & File Name */}
-        <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-white text-xs z-10">
-          {publication.fileName ? (
-            <span className="font-mono text-[10px] bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 truncate max-w-[180px]">
+        {/* File Name */}
+        {publication.fileName && (
+          <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center text-white text-xs z-10">
+            <span className="font-mono text-[10px] bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 truncate max-w-[200px]">
               📎 {publication.fileName}
             </span>
-          ) : (
-            <span />
-          )}
-          {publication.readTimeMinutes && (
-            <span className="flex items-center gap-1 text-[11px] font-medium bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10">
-              <Clock className="w-3 h-3" />
-              {publication.readTimeMinutes} min read
-            </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Card Body */}
