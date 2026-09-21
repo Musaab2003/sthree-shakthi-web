@@ -825,6 +825,174 @@ export const storageService = {
     return { success: true };
   },
 
+  // --- Account Lockout & Security (3 Failed Attempts -> 1 Hour Cooldown) ---
+  getUserLockout(email: string): { isLocked: boolean; remainingSeconds: number; remainingMinutes: number; attempts: number } {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return { isLocked: false, remainingSeconds: 0, remainingMinutes: 0, attempts: 0 };
+    try {
+      const data = localStorage.getItem(`sthree_lockout_${cleanEmail}`);
+      if (!data) return { isLocked: false, remainingSeconds: 0, remainingMinutes: 0, attempts: 0 };
+      const parsed = JSON.parse(data);
+      const attempts = Number(parsed.attempts) || 0;
+      const lockedUntil = Number(parsed.lockedUntil) || 0;
+      const now = Date.now();
+
+      if (lockedUntil && now < lockedUntil) {
+        const remainingSeconds = Math.ceil((lockedUntil - now) / 1000);
+        const remainingMinutes = Math.ceil(remainingSeconds / 60);
+        return { isLocked: true, remainingSeconds, remainingMinutes, attempts };
+      }
+
+      // Lock expired
+      if (lockedUntil && now >= lockedUntil) {
+        localStorage.removeItem(`sthree_lockout_${cleanEmail}`);
+        return { isLocked: false, remainingSeconds: 0, remainingMinutes: 0, attempts: 0 };
+      }
+
+      return { isLocked: false, remainingSeconds: 0, remainingMinutes: 0, attempts };
+    } catch {
+      return { isLocked: false, remainingSeconds: 0, remainingMinutes: 0, attempts: 0 };
+    }
+  },
+
+  recordFailedLoginAttempt(email: string): { isLocked: boolean; remainingSeconds: number; remainingMinutes: number; attempts: number; message: string } {
+    const cleanEmail = email.trim().toLowerCase();
+    try {
+      const current = this.getUserLockout(cleanEmail);
+      const newAttempts = current.attempts + 1;
+
+      if (newAttempts >= 3) {
+        const lockDuration = 60 * 60 * 1000; // 1 hour (3600 seconds)
+        const lockedUntil = Date.now() + lockDuration;
+        localStorage.setItem(`sthree_lockout_${cleanEmail}`, JSON.stringify({ attempts: newAttempts, lockedUntil }));
+        return {
+          isLocked: true,
+          remainingSeconds: 3600,
+          remainingMinutes: 60,
+          attempts: newAttempts,
+          message: 'Account temporarily locked due to 3 consecutive failed login attempts. Please wait 1 hour to retry, or use "Forgot Password?" to reset your password immediately.'
+        };
+      }
+
+      localStorage.setItem(`sthree_lockout_${cleanEmail}`, JSON.stringify({ attempts: newAttempts, lockedUntil: 0 }));
+      const remainingTries = 3 - newAttempts;
+      return {
+        isLocked: false,
+        remainingSeconds: 0,
+        remainingMinutes: 0,
+        attempts: newAttempts,
+        message: `Invalid password. ${remainingTries} attempt(s) remaining before 1-hour account lockout.`
+      };
+    } catch {
+      return {
+        isLocked: false,
+        remainingSeconds: 0,
+        remainingMinutes: 0,
+        attempts: 1,
+        message: 'Invalid password. Please try again.'
+      };
+    }
+  },
+
+  clearUserLockout(email: string): void {
+    const cleanEmail = email.trim().toLowerCase();
+    try {
+      localStorage.removeItem(`sthree_lockout_${cleanEmail}`);
+    } catch {}
+  },
+
+  // --- Password Recovery via Email OTP ---
+  async sendPasswordResetOtp(email: string): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      return { success: false, message: 'Please enter your registered email address.' };
+    }
+
+    // 1. Check if user account exists
+    let user = await firebaseService.getUserByEmail(cleanEmail);
+    if (!user) {
+      user = this.getAllUsers().find(u => u.email.toLowerCase() === cleanEmail) || null;
+    }
+
+    if (!user) {
+      return { success: false, message: `No registered account found with email "${cleanEmail}". Please check your email or register a new account.` };
+    }
+
+    // 2. Generate 6-digit OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    await firebaseService.saveEmailOtp(cleanEmail, otpCode, expiresAt);
+    try {
+      localStorage.setItem(`sthree_otp_${cleanEmail}`, JSON.stringify({ otp: otpCode, expiresAt }));
+    } catch {}
+
+    const emailResult = await emailService.sendOtpEmail({
+      toEmail: cleanEmail,
+      toName: user.name || 'Contributor',
+      otp: otpCode
+    });
+
+    return {
+      success: true,
+      message: emailResult.message || `A 6-digit password reset code has been sent to ${cleanEmail}. Please check your inbox and spam folder.`
+    };
+  },
+
+  async resetUserPassword(
+    email: string,
+    otpCode: string,
+    newPassword: string
+  ): Promise<{ success: boolean; user?: UserAccount; message?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = newPassword.trim();
+    const cleanCode = otpCode.trim();
+
+    if (!cleanCode || cleanCode.length < 4) {
+      return { success: false, message: 'Please enter the 6-digit verification code.' };
+    }
+
+    if (!cleanPass || cleanPass.length < 6) {
+      return { success: false, message: 'New password must be at least 6 characters long.' };
+    }
+
+    if (/\s/.test(newPassword)) {
+      return { success: false, message: 'Passwords cannot contain spaces.' };
+    }
+
+    // Verify OTP
+    const verifyRes = await this.verifyRegistrationOtp(cleanEmail, cleanCode);
+    if (!verifyRes.success) {
+      return { success: false, message: verifyRes.message || 'Invalid or expired verification code.' };
+    }
+
+    // Fetch user
+    let user = await firebaseService.getUserByEmail(cleanEmail);
+    if (!user) {
+      user = this.getAllUsers().find(u => u.email.toLowerCase() === cleanEmail) || null;
+    }
+
+    if (!user) {
+      return { success: false, message: 'User account not found.' };
+    }
+
+    // Hash new password and update
+    const hashed = await hashPassword(cleanPass);
+    const updatedUser: UserAccount = {
+      ...user,
+      passwordHash: hashed,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.saveUserAccount(updatedUser);
+    await firebaseService.saveUser(updatedUser);
+
+    // Clear failed attempts lockout
+    this.clearUserLockout(cleanEmail);
+
+    return { success: true, user: updatedUser, message: 'Password reset successfully! You can now sign in with your new password.' };
+  },
+
   async registerUser(
     name: string,
     email: string,
@@ -833,8 +1001,16 @@ export const storageService = {
   ): Promise<{ success: boolean; user?: UserAccount; message?: string }> {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
-    if (!cleanEmail || !cleanName || !password.trim()) {
+    if (!cleanEmail || !cleanName || !password) {
       return { success: false, message: 'Please provide full name, valid email, and password.' };
+    }
+
+    if (/\s/.test(password)) {
+      return { success: false, message: 'Passwords cannot contain spaces.' };
+    }
+
+    if (password.length < 6) {
+      return { success: false, message: 'Password must be at least 6 characters long.' };
     }
 
     // Check if user already exists in Firestore or locally
@@ -844,7 +1020,7 @@ export const storageService = {
       return { success: false, message: 'An account with this email address already exists. Please log in.' };
     }
 
-    const hashed = await hashPassword(password.trim());
+    const hashed = await hashPassword(password);
     const newUser: UserAccount = {
       id: `usr-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       name: cleanName,
@@ -866,11 +1042,27 @@ export const storageService = {
   async loginUser(
     email: string,
     password: string
-  ): Promise<{ success: boolean; user?: UserAccount; message?: string }> {
+  ): Promise<{ success: boolean; user?: UserAccount; message?: string; isLocked?: boolean; remainingMinutes?: number }> {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPass = password.trim();
+    
+    if (/\s/.test(password)) {
+      return { success: false, message: 'Passwords cannot contain spaces.' };
+    }
+
+    const cleanPass = password;
     if (!cleanEmail || !cleanPass) {
       return { success: false, message: 'Please enter both email and password.' };
+    }
+
+    // Check account lockout cooldown
+    const lockout = this.getUserLockout(cleanEmail);
+    if (lockout.isLocked) {
+      return {
+        success: false,
+        isLocked: true,
+        remainingMinutes: lockout.remainingMinutes,
+        message: `Account locked due to 3 failed attempts. Please retry in ${lockout.remainingMinutes} minute(s) or click "Forgot Password?" to reset immediately.`
+      };
     }
 
     try {
@@ -882,9 +1074,15 @@ export const storageService = {
         user = this.getAllUsers().find(u => u.email.toLowerCase() === cleanEmail) || null;
       }
 
+      if (!user) {
+        return { success: false, message: 'No registered account found with this email. Please register.' };
+      }
+
       if (user && user.passwordHash) {
         const isMatch = await verifyPassword(cleanPass, user.passwordHash) || cleanPass === user.passwordHash;
         if (isMatch) {
+          // Success: Clear lockout attempts
+          this.clearUserLockout(cleanEmail);
           // Sync account to local storage on new device
           this.saveUserAccount(user);
           this.setCurrentUser(user, true);
@@ -892,7 +1090,14 @@ export const storageService = {
         }
       }
 
-      return { success: false, message: 'Invalid email or password. Please check your credentials.' };
+      // Password mismatch -> record failed attempt
+      const failInfo = this.recordFailedLoginAttempt(cleanEmail);
+      return {
+        success: false,
+        isLocked: failInfo.isLocked,
+        remainingMinutes: failInfo.remainingMinutes,
+        message: failInfo.message
+      };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Login failed. Please try again.' };
     }

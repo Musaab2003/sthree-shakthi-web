@@ -365,12 +365,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     if (e) e.preventDefault();
     setAuthError('');
     const cleanUser = usernameInput.trim().toLowerCase();
-    const cleanPass = passwordInput.trim();
+    const cleanPass = passwordInput.replace(/\s/g, '');
 
     if (!cleanUser || !cleanPass) {
       setAuthError('Please enter both username and password.');
       return;
     }
+
+    if (/\s/.test(passwordInput)) {
+      setAuthError('Passwords cannot contain spaces.');
+      return;
+    }
+
+    // Check admin lockout (3 failed attempts -> 1 hour cooldown)
+    const lockKey = `sthree_admin_lockout_${cleanUser}`;
+    try {
+      const lockData = localStorage.getItem(lockKey);
+      if (lockData) {
+        const parsed = JSON.parse(lockData);
+        if (parsed.lockedUntil && Date.now() < parsed.lockedUntil) {
+          const remMins = Math.ceil((parsed.lockedUntil - Date.now()) / (60 * 1000));
+          setAuthError(`Admin portal locked due to 3 failed attempts. Please retry in ${remMins} minute(s).`);
+          return;
+        }
+      }
+    } catch {}
 
     try {
       // 1. Check directly against Firebase Firestore database admins collection
@@ -396,11 +415,31 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           setIsAuthenticated(true);
           try {
             sessionStorage.setItem('sthree_shakthi_admin_session', 'true');
+            localStorage.removeItem(lockKey);
           } catch {}
           setAuthError('');
           return;
         }
       }
+
+      // Record failed attempt
+      let attempts = 1;
+      try {
+        const lockData = localStorage.getItem(lockKey);
+        if (lockData) {
+          attempts = (JSON.parse(lockData).attempts || 0) + 1;
+        }
+        if (attempts >= 3) {
+          const lockedUntil = Date.now() + 60 * 60 * 1000;
+          localStorage.setItem(lockKey, JSON.stringify({ attempts, lockedUntil }));
+          setAuthError('Admin portal locked for 1 hour due to 3 consecutive failed login attempts.');
+          return;
+        } else {
+          localStorage.setItem(lockKey, JSON.stringify({ attempts, lockedUntil: 0 }));
+          setAuthError(`Invalid credentials. ${3 - attempts} attempt(s) remaining before 1-hour lockout.`);
+          return;
+        }
+      } catch {}
 
       setAuthError('Invalid username or password. Please verify your database credentials.');
     } catch (err) {
@@ -601,7 +640,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       required
                       placeholder="Enter password"
                       value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+                      onChange={(e) => setPasswordInput(e.target.value.replace(/\s/g, ''))}
                       className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30 focus:border-[#D95F7F]"
                     />
                     <button
@@ -860,7 +900,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         required
                         placeholder="Enter current password to authorize credential update"
                         value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+                        onChange={(e) => setCurrentPassword(e.target.value.replace(/\s/g, ''))}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
                       />
                     </div>
@@ -873,7 +914,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           type="text"
                           placeholder="Type or click 'Generate Unique Password'"
                           value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+                          onChange={(e) => setNewPassword(e.target.value.replace(/\s/g, ''))}
                           className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
                         />
                       </div>
@@ -884,7 +926,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           type="text"
                           placeholder="Re-type new password"
                           value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+                          onChange={(e) => setConfirmPassword(e.target.value.replace(/\s/g, ''))}
                           className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF2EB]/50 border border-[#F4E5DA] text-xs font-mono text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
                         />
                       </div>
@@ -1011,9 +1054,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         <input
                           type="password"
                           required
-                          placeholder="Secret password"
+                          placeholder="Secret password (no spaces)"
                           value={newAdminPass}
-                          onChange={(e) => setNewAdminPass(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+                          onChange={(e) => setNewAdminPass(e.target.value.replace(/\s/g, ''))}
                           className="w-full px-3 py-2 rounded-xl bg-white border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
                         />
                       </div>
