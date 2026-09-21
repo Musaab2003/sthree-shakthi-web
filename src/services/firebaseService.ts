@@ -658,10 +658,39 @@ export const firebaseService = {
         registeredAt: user.registeredAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }, { merge: true });
+      console.log(`[Firestore] Saved user "${cleanEmail}" into "users" collection (doc: ${docId})`);
       return true;
     } catch (err) {
       console.error('Firebase saveUser error:', err);
       return false;
+    }
+  },
+
+  onUsersSnapshot(callback: (users: UserAccount[]) => void): Unsubscribe | null {
+    const db = this.getDb();
+    if (!db) return null;
+    try {
+      return onSnapshot(collection(db, 'users'), (snapshot) => {
+        const list: UserAccount[] = snapshot.docs.map(d => {
+          const data = d.data();
+          return {
+            id: data.id || d.id,
+            name: data.name || '',
+            email: (data.email || d.id.replace(/___/g, '.')).trim().toLowerCase(),
+            passwordHash: data.passwordHash || '',
+            club: data.club || undefined,
+            role: data.role || 'contributor',
+            registeredAt: data.registeredAt || new Date().toISOString(),
+            updatedAt: data.updatedAt || undefined
+          };
+        });
+        callback(list);
+      }, (error) => {
+        console.warn('Firestore onUsersSnapshot warning:', error);
+      });
+    } catch (e) {
+      console.warn('Firestore onUsersSnapshot setup error:', e);
+      return null;
     }
   },
 

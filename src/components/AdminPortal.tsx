@@ -139,12 +139,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       }
     }).catch(() => {});
 
-    // Fetch cloud registered users in background
-    firebaseService.getUsers().then(cloudUsers => {
-      if (cloudUsers && cloudUsers.length > 0) {
+    // Subscribe to cloud registered users collection in real-time
+    const unsubUsers = firebaseService.onUsersSnapshot((cloudUsers) => {
+      if (cloudUsers) {
         setRegisteredUsers(cloudUsers);
       }
-    }).catch(() => {});
+    });
+
+    return () => {
+      if (unsubUsers) unsubUsers();
+    };
   }, [isOpen]);
 
   // Compute live hash when newPassword changes
