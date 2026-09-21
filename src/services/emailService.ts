@@ -1,6 +1,4 @@
-// Email Delivery Service for Sthree Shakthi
-// Dispatches verification OTP tokens and notifications directly to recipients' Gmail / Inboxes
-
+import emailjs from '@emailjs/browser';
 import { EmailConfig } from '../types';
 
 const EMAIL_CONFIG_KEY = 'sthree_shakthi_email_config_v2';
@@ -65,36 +63,31 @@ Rotaract District 3220 • Sri Lanka
 https://sthreeshakthi.web.app
     `.trim();
 
-    // 1. If EmailJS is configured, send via EmailJS REST API
+    // 1. Send via official @emailjs/browser SDK
     if (config.emailjsServiceId && config.emailjsTemplateId && config.emailjsPublicKey) {
       try {
-        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        const response = await emailjs.send(
+          config.emailjsServiceId,
+          config.emailjsTemplateId,
+          {
+            to_name: recipientName,
+            to_email: recipient,
+            otp_code: otp,
+            subject: subject,
+            message: emailBody,
           },
-          body: JSON.stringify({
-            service_id: config.emailjsServiceId,
-            template_id: config.emailjsTemplateId,
-            user_id: config.emailjsPublicKey,
-            template_params: {
-              to_name: recipientName,
-              to_email: recipient,
-              otp_code: otp,
-              subject: subject,
-              message: emailBody,
-            },
-          }),
-        });
+          config.emailjsPublicKey
+        );
 
-        if (response.ok) {
+        if (response.status === 200 || response.text === 'OK') {
+          console.log(`[EmailJS] Successfully dispatched 6-digit OTP to ${recipient}`);
           return {
             success: true,
-            message: `A 6-digit verification code has been dispatched to ${recipient}.`
+            message: `A 6-digit verification code has been dispatched to ${recipient}. Please check your inbox and spam folder.`
           };
         }
       } catch (err) {
-        console.warn('EmailJS dispatch failed, trying backup relay...', err);
+        console.warn('EmailJS SDK notice:', err);
       }
     }
 
