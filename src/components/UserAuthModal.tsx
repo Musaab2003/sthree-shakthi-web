@@ -456,6 +456,9 @@ export const UserAuthModal: React.FC<UserAuthModalProps> = ({
                 <div className="relative">
                   <input
                     type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
                     required
                     maxLength={6}
                     placeholder="• • • • • •"
