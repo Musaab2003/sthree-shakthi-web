@@ -381,9 +381,10 @@ export const PublicationViewerModal: React.FC<PublicationViewerModalProps> = ({
                 title={publication.title}
               />
             ) : (
-              <PdfCanvasViewer
-                dataUrlOrBlob={loadedFileData || publication.fileData || effectiveDocUrl}
+              <iframe
+                src={`${effectiveDocUrl}#toolbar=1&navpanes=1`}
                 title={publication.title}
+                className="w-full h-full flex-1 border-0 bg-slate-900"
               />
             )
           ) : (
