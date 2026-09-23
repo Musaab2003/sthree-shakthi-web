@@ -21,6 +21,8 @@ import {
   UserCheck,
   KeyRound,
   Mail,
+  Heart,
+  Calendar,
   ShieldCheck,
   Settings,
   Save,
@@ -113,6 +115,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Registered Users State
   const [registeredUsers, setRegisteredUsers] = useState<UserAccount[]>(() => storageService.getAllUsers());
   const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSortBy, setUserSortBy] = useState<'newest' | 'oldest' | 'name' | 'submissions'>('newest');
+  const [selectedUserDetails, setSelectedUserDetails] = useState<UserAccount | null>(null);
+  const [copiedTextKey, setCopiedTextKey] = useState<string | null>(null);
   const [userOpNotice, setUserOpNotice] = useState('');
   const [isPurgingSampleData, setIsPurgingSampleData] = useState(false);
   const [purgeNotice, setPurgeNotice] = useState('');
@@ -211,6 +216,67 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     } catch (e: any) {
       setUserOpNotice(`⚠️ Error deleting users: ${e?.message || 'Failed'}`);
     }
+  };
+
+  const handleCopyText = (text: string, key: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedTextKey(key);
+      setTimeout(() => setCopiedTextKey(null), 2500);
+    } catch {}
+  };
+
+  const handleExportUsersCSV = () => {
+    if (registeredUsers.length === 0) {
+      alert('No registered users to export.');
+      return;
+    }
+    const headers = [
+      'User ID',
+      'Name',
+      'Email',
+      'Rotaract Club',
+      'Role',
+      'Registered At',
+      'Total Submissions',
+      'Approved Live Submissions',
+      'Pending Review Submissions',
+      'Rejected Submissions',
+      'Total Reader Views',
+      'Total Reader Likes'
+    ];
+    const rows = registeredUsers.map(user => {
+      const userPubs = publications.filter(
+        p => (p.authorEmail || '').trim().toLowerCase() === user.email.trim().toLowerCase()
+      );
+      const approved = userPubs.filter(p => p.status === 'approved').length;
+      const pending = userPubs.filter(p => p.status === 'pending').length;
+      const rejected = userPubs.filter(p => p.status === 'rejected').length;
+      const totalViews = userPubs.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+      const totalLikes = userPubs.reduce((sum, p) => sum + (Number(p.likes) || 0), 0);
+      return [
+        `"${user.id || ''}"`,
+        `"${(user.name || '').replace(/"/g, '""')}"`,
+        `"${(user.email || '').replace(/"/g, '""')}"`,
+        `"${(user.club || 'Independent Contributor').replace(/"/g, '""')}"`,
+        `"${user.role || 'contributor'}"`,
+        `"${user.registeredAt ? new Date(user.registeredAt).toLocaleString() : ''}"`,
+        userPubs.length,
+        approved,
+        pending,
+        rejected,
+        totalViews,
+        totalLikes
+      ].join(',');
+    });
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `registered_contributors_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handlePurgeSampleData = async () => {
@@ -1269,25 +1335,30 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <Users className="w-4 h-4 text-[#D95F7F] shrink-0" />
                       <span>{userOpNotice}</span>
                     </div>
-                    <button onClick={() => setUserOpNotice('')} className="text-slate-400 hover:text-slate-700 font-bold text-xs">
+                    <button onClick={() => setUserOpNotice('')} className="text-slate-400 hover:text-slate-700 font-bold text-xs cursor-pointer">
                       ✕
                     </button>
                   </div>
                 )}
 
                 {/* Header & Controls */}
-                <div className="bg-white p-6 rounded-[32px] border border-[#F4E5DA] shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-4">
+                <div className="bg-white p-6 rounded-[32px] border border-[#F4E5DA] shadow-xs space-y-5">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#F4E5DA] pb-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-[#D95F7F]/15 text-[#D95F7F] flex items-center justify-center font-bold">
-                        <Users className="w-5 h-5" />
+                      <div className="w-12 h-12 rounded-2xl bg-[#D95F7F]/15 text-[#D95F7F] flex items-center justify-center font-bold shrink-0 border border-[#D95F7F]/20">
+                        <Users className="w-6 h-6" />
                       </div>
                       <div>
-                        <h3 className="font-serif text-lg font-bold text-[#3E1028]">
-                          Registered Contributors ({registeredUsers.length})
-                        </h3>
-                        <p className="text-xs text-[#5C1D3B]/70">
-                          All verified user accounts in Firebase Cloud Firestore (`users` collection).
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-serif text-lg font-bold text-[#3E1028]">
+                            Registered Contributors Directory
+                          </h3>
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            Live Database ({registeredUsers.length})
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#5C1D3B]/70 mt-0.5">
+                          Complete profile details, activity history, and submissions of all registered contributors.
                         </p>
                       </div>
                     </div>
@@ -1295,34 +1366,89 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={handleClearAllUsers}
-                        className="px-4 py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        onClick={handleExportUsersCSV}
+                        className="px-4 py-2 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                        title="Download complete registered users list with details in CSV/Excel format"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Delete All Users</span>
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Export CSV Report</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={handleSyncAllUsersToCloud}
-                        className="px-4 py-2 rounded-full bg-white hover:bg-slate-50 border border-[#F4E5DA] text-xs font-bold text-[#3E1028] transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        className="px-4 py-2 rounded-full bg-white hover:bg-slate-50 border border-[#F4E5DA] text-xs font-bold text-[#3E1028] transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
                       >
                         <RefreshCw className="w-3.5 h-3.5 text-[#D95F7F]" />
                         <span>Sync Cloud Users</span>
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={handleClearAllUsers}
+                        className="px-3.5 py-2 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Delete All</span>
+                      </button>
                     </div>
                   </div>
 
-                  {/* Search Filter for Users */}
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-3" />
-                    <input
-                      type="text"
-                      placeholder="Search contributors by name, email, or club..."
-                      value={userSearchQuery}
-                      onChange={(e) => setUserSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/20"
-                    />
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3.5 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA]">
+                      <div className="text-[10px] font-black uppercase text-[#5C1D3B]/70">Total Users</div>
+                      <div className="text-xl font-bold font-serif text-[#3E1028] mt-0.5">{registeredUsers.length}</div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/70">
+                      <div className="text-[10px] font-black uppercase text-blue-800">Active Authors</div>
+                      <div className="text-xl font-bold font-serif text-blue-900 mt-0.5">
+                        {registeredUsers.filter(u => publications.some(p => (p.authorEmail || '').trim().toLowerCase() === u.email.trim().toLowerCase())).length}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/70">
+                      <div className="text-[10px] font-black uppercase text-emerald-800">Approved Submissions</div>
+                      <div className="text-xl font-bold font-serif text-emerald-900 mt-0.5">
+                        {publications.filter(p => p.status === 'approved' && registeredUsers.some(u => u.email.toLowerCase() === (p.authorEmail || '').toLowerCase())).length}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-rose-50/70 border border-rose-200/70">
+                      <div className="text-[10px] font-black uppercase text-rose-800">Total Reader Views</div>
+                      <div className="text-xl font-bold font-serif text-[#D95F7F] mt-0.5">
+                        {publications.reduce((sum, p) => sum + (Number(p.views) || 0), 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Search and Sort Filter Row */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                    <div className="relative flex-grow w-full">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-3" />
+                      <input
+                        type="text"
+                        placeholder="Search contributors by name, email, club, or User ID..."
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/20"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                      <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Sort:</span>
+                      <select
+                        value={userSortBy}
+                        onChange={(e) => setUserSortBy(e.target.value as any)}
+                        className="w-full sm:w-auto px-3.5 py-2.5 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA] text-xs font-semibold text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/20 cursor-pointer"
+                      >
+                        <option value="newest">Newest Registered</option>
+                        <option value="oldest">Oldest Registered</option>
+                        <option value="name">Name (A → Z)</option>
+                        <option value="submissions">Most Submissions</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -1333,10 +1459,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       if (!userSearchQuery) return true;
                       const q = userSearchQuery.toLowerCase();
                       return (
-                        u.name.toLowerCase().includes(q) ||
-                        u.email.toLowerCase().includes(q) ||
-                        (u.club || '').toLowerCase().includes(q)
+                        (u.name || '').toLowerCase().includes(q) ||
+                        (u.email || '').toLowerCase().includes(q) ||
+                        (u.club || '').toLowerCase().includes(q) ||
+                        (u.id || '').toLowerCase().includes(q)
                       );
+                    })
+                    .sort((a, b) => {
+                      if (userSortBy === 'name') {
+                        return (a.name || '').localeCompare(b.name || '');
+                      }
+                      if (userSortBy === 'oldest') {
+                        return new Date(a.registeredAt || 0).getTime() - new Date(b.registeredAt || 0).getTime();
+                      }
+                      if (userSortBy === 'submissions') {
+                        const aCount = publications.filter(p => (p.authorEmail || '').trim().toLowerCase() === a.email.trim().toLowerCase()).length;
+                        const bCount = publications.filter(p => (p.authorEmail || '').trim().toLowerCase() === b.email.trim().toLowerCase()).length;
+                        return bCount - aCount;
+                      }
+                      return new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime();
                     })
                     .map((user) => {
                       const userSubmissions = publications.filter(
@@ -1344,64 +1485,133 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       );
                       const pendingSubmissions = userSubmissions.filter(p => p.status === 'pending');
                       const approvedSubmissions = userSubmissions.filter(p => p.status === 'approved');
+                      const rejectedSubmissions = userSubmissions.filter(p => p.status === 'rejected');
+                      const totalViews = userSubmissions.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+                      const totalLikes = userSubmissions.reduce((sum, p) => sum + (Number(p.likes) || 0), 0);
 
                       return (
                         <div
                           key={user.id || user.email}
-                          className="p-4 sm:p-5 rounded-3xl bg-white border border-[#F4E5DA] shadow-xs hover:shadow-md transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                          className="p-5 rounded-3xl bg-white border border-[#F4E5DA] shadow-xs hover:shadow-md transition-all flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 group"
                         >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-11 h-11 rounded-2xl bg-[#D95F7F] text-white flex items-center justify-center font-bold text-sm uppercase shrink-0 shadow-xs">
-                              {user.name.slice(0, 2)}
+                          {/* User identity & info */}
+                          <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-grow">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D95F7F] to-[#A43B57] text-white flex items-center justify-center font-bold text-sm uppercase shrink-0 shadow-xs border border-white/20">
+                              {(user.name || 'U').slice(0, 2)}
                             </div>
-                            <div className="min-w-0">
+                            
+                            <div className="min-w-0 space-y-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-serif text-base font-bold text-[#3E1028] truncate">
                                   {user.name}
                                 </span>
-                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200 uppercase tracking-wider">
                                   {user.role || 'contributor'}
                                 </span>
                                 {user.club && (
-                                  <span className="px-2 py-0.5 rounded-full bg-[#FAF2EB] text-[#D95F7F] text-[10px] font-bold border border-[#F4E5DA] truncate max-w-[200px]">
+                                  <span className="px-2.5 py-0.5 rounded-full bg-[#FAF2EB] text-[#D95F7F] text-[10px] font-bold border border-[#F4E5DA] truncate max-w-[220px]">
                                     {user.club}
                                   </span>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyText(user.id || user.email, `id_${user.id || user.email}`)}
+                                  className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400 hover:text-slate-700 bg-slate-50 hover:bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                                  title="Copy User UID"
+                                >
+                                  <span>UID: {(user.id || user.email).slice(0, 10)}...</span>
+                                  {copiedTextKey === `id_${user.id || user.email}` ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
                               </div>
-                              <div className="text-xs text-[#5C1D3B]/70 flex items-center gap-2 mt-0.5 truncate">
-                                <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span className="truncate">{user.email}</span>
+
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#5C1D3B]/75">
+                                <div className="flex items-center gap-1.5">
+                                  <Mail className="w-3.5 h-3.5 text-[#D95F7F] shrink-0" />
+                                  <a
+                                    href={`mailto:${user.email}`}
+                                    className="hover:underline hover:text-[#D95F7F] font-medium"
+                                    title="Send email to contributor"
+                                  >
+                                    {user.email}
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyText(user.email, `email_${user.email}`)}
+                                    className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+                                    title="Copy Email"
+                                  >
+                                    {copiedTextKey === `email_${user.email}` ? (
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
+
                                 {user.registeredAt && (
-                                  <span className="text-slate-400 text-[11px] hidden sm:inline">
-                                    • Joined {new Date(user.registeredAt).toLocaleDateString()}
-                                  </span>
+                                  <div className="flex items-center gap-1 text-slate-400 text-[11px]">
+                                    <Calendar className="w-3 h-3" />
+                                    <span>Joined: {new Date(user.registeredAt).toLocaleString()}</span>
+                                  </div>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 self-end md:self-center shrink-0">
-                            {/* Submissions stats */}
-                            <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FAF2EB]/60 border border-[#F4E5DA]">
+                          {/* Submissions stats & engagement */}
+                          <div className="flex flex-wrap items-center gap-2.5 self-stretch xl:self-center justify-between xl:justify-end shrink-0 pt-2 xl:pt-0 border-t xl:border-t-0 border-[#F4E5DA]">
+                            <div className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA]">
                               <FileText className="w-3.5 h-3.5 text-[#D95F7F]" />
                               <span>{userSubmissions.length} Submissions</span>
-                              {pendingSubmissions.length > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[9px] font-bold">
-                                  {pendingSubmissions.length} Pending
-                                </span>
-                              )}
                               {approvedSubmissions.length > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[9px] font-bold">
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-bold">
                                   {approvedSubmissions.length} Live
                                 </span>
                               )}
+                              {pendingSubmissions.length > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold">
+                                  {pendingSubmissions.length} Pending
+                                </span>
+                              )}
+                              {rejectedSubmissions.length > 0 && (
+                                <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-bold">
+                                  {rejectedSubmissions.length} Rejected
+                                </span>
+                              )}
                             </div>
+
+                            <div className="flex items-center gap-2 text-xs text-slate-500 px-3 py-1.5 rounded-2xl bg-white border border-[#F4E5DA]">
+                              <span className="flex items-center gap-1" title="Total Reader Views">
+                                <Eye className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="font-bold text-slate-700">{totalViews}</span>
+                              </span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1" title="Total Likes Received">
+                                <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+                                <span className="font-bold text-slate-700">{totalLikes}</span>
+                              </span>
+                            </div>
+
+                            {/* View Details Button */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserDetails(user)}
+                              className="px-3.5 py-1.5 rounded-full bg-[#FAF2EB] hover:bg-[#F4E5DA] text-[#3E1028] border border-[#F4E5DA] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+                              title="View full account details & submissions"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-[#D95F7F]" />
+                              <span>Details</span>
+                            </button>
 
                             {/* Delete Contributor Account */}
                             <button
                               type="button"
                               onClick={() => handleDeleteUser(user.email)}
-                              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                               title="Delete Contributor Account from Firebase"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1612,6 +1822,246 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
           </div>
         )}
+
+        {/* Contributor Profile & Submission Details Inspection Modal */}
+        {selectedUserDetails && (() => {
+          const user = selectedUserDetails;
+          const userPubs = publications.filter(
+            p => (p.authorEmail || '').trim().toLowerCase() === user.email.trim().toLowerCase()
+          );
+          const approvedPubs = userPubs.filter(p => p.status === 'approved');
+          const pendingPubs = userPubs.filter(p => p.status === 'pending');
+          const totalViews = userPubs.reduce((sum, p) => sum + (Number(p.views) || 0), 0);
+          const totalLikes = userPubs.reduce((sum, p) => sum + (Number(p.likes) || 0), 0);
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-white rounded-[32px] border border-[#F4E5DA] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                
+                {/* Modal Header */}
+                <div className="p-6 bg-gradient-to-r from-[#FAF2EB] via-white to-[#FAF2EB] border-b border-[#F4E5DA] flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#D95F7F] to-[#A43B57] text-white flex items-center justify-center font-bold text-lg uppercase shrink-0 shadow-md border-2 border-white">
+                      {(user.name || 'U').slice(0, 2)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-serif text-xl font-bold text-[#3E1028] truncate">
+                          {user.name}
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200 uppercase tracking-wider">
+                          {user.role || 'contributor'}
+                        </span>
+                        {user.club && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-[#FAF2EB] text-[#D95F7F] text-[10px] font-bold border border-[#F4E5DA]">
+                            {user.club}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[#5C1D3B]/70 mt-0.5 flex items-center gap-2">
+                        <span>{user.email}</span>
+                        {user.registeredAt && (
+                          <span>• Registered {new Date(user.registeredAt).toLocaleDateString()}</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserDetails(null)}
+                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all shrink-0 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Modal Scrollable Body */}
+                <div className="flex-grow overflow-y-auto p-6 space-y-6">
+                  
+                  {/* Account Metadata Grid */}
+                  <div>
+                    <h4 className="text-xs font-bold text-[#3E1028] uppercase tracking-wider mb-3">
+                      Account & Verification Details
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">User UID / ID</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs text-[#3E1028] font-bold truncate">
+                            {user.id || user.email}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(user.id || user.email, `modal_id`)}
+                            className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer shrink-0"
+                            title="Copy UID"
+                          >
+                            {copiedTextKey === 'modal_id' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Registered Email</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-[#3E1028] font-semibold truncate">{user.email}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(user.email, `modal_email`)}
+                            className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer shrink-0"
+                            title="Copy Email"
+                          >
+                            {copiedTextKey === 'modal_email' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Rotaract Club / Organization</div>
+                        <div className="text-xs text-[#3E1028] font-semibold">{user.club || 'Independent Contributor'}</div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-[#FAF2EB]/50 border border-[#F4E5DA] space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase">Exact Registration Date & Time</div>
+                        <div className="text-xs text-[#3E1028] font-semibold">
+                          {user.registeredAt ? new Date(user.registeredAt).toLocaleString() : 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Activity & Performance Metrics */}
+                  <div>
+                    <h4 className="text-xs font-bold text-[#3E1028] uppercase tracking-wider mb-3">
+                      Author Impact & Submission Summary
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200/80">
+                        <div className="text-[10px] font-bold text-blue-800 uppercase">Total Submissions</div>
+                        <div className="text-xl font-bold font-serif text-blue-950 mt-0.5">{userPubs.length}</div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200/80">
+                        <div className="text-[10px] font-bold text-emerald-800 uppercase">Approved Live</div>
+                        <div className="text-xl font-bold font-serif text-emerald-950 mt-0.5">{approvedPubs.length}</div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80">
+                        <div className="text-[10px] font-bold text-amber-800 uppercase">Pending Review</div>
+                        <div className="text-xl font-bold font-serif text-amber-950 mt-0.5">{pendingPubs.length}</div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200/80">
+                        <div className="text-[10px] font-bold text-rose-800 uppercase">Views / Likes</div>
+                        <div className="text-sm font-bold font-serif text-[#D95F7F] mt-1.5 flex items-center gap-2">
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-3.5 h-3.5" />
+                            {totalViews}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Heart className="w-3.5 h-3.5 fill-rose-500" />
+                            {totalLikes}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* User Submissions List */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-xs font-bold text-[#3E1028] uppercase tracking-wider">
+                        Authored Submissions ({userPubs.length})
+                      </h4>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {userPubs.length > 0 ? (
+                        userPubs.map(pub => (
+                          <div
+                            key={pub.id}
+                            className="p-3.5 rounded-2xl bg-[#FAF2EB]/40 border border-[#F4E5DA] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:bg-[#FAF2EB]/70 transition-all"
+                          >
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-serif text-sm font-bold text-[#3E1028] truncate max-w-sm">
+                                  {pub.title}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                  pub.status === 'approved'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : pub.status === 'pending'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {pub.status}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                  {pub.type === 'word' ? '📝 Word' : '📄 PDF'}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                                <span>Submitted: {new Date(pub.submittedAt).toLocaleDateString()}</span>
+                                <span>•</span>
+                                <span>{pub.views || 0} views</span>
+                                <span>•</span>
+                                <span>{pub.likes || 0} likes</span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => onOpenViewer(pub)}
+                              className="px-3 py-1.5 rounded-full bg-white hover:bg-slate-100 border border-[#F4E5DA] text-xs font-bold text-[#3E1028] transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-2xs"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-[#D95F7F]" />
+                              <span>Preview</span>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center rounded-2xl bg-[#FAF2EB]/30 border border-[#F4E5DA] text-xs text-slate-400">
+                          This contributor has not submitted any documents yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Modal Footer */}
+                <div className="p-4 bg-[#FAF2EB]/50 border-t border-[#F4E5DA] flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500">
+                    UID: <span className="font-mono">{user.id || user.email}</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedUserDetails(null);
+                        handleDeleteUser(user.email);
+                      }}
+                      className="px-3.5 py-1.5 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Contributor</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUserDetails(null)}
+                      className="px-4 py-1.5 rounded-full bg-[#3E1028] hover:bg-[#5C1D3B] text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
