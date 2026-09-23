@@ -46,10 +46,9 @@ import {
   ChevronUp,
   FileCheck
 } from 'lucide-react';
-import { Publication, PublicationStatus, AdminAccount, UserAccount, DatabaseConfig, FirebaseConfig, EmailConfig } from '../types';
+import { Publication, PublicationStatus, AdminAccount, UserAccount, DatabaseConfig, FirebaseConfig } from '../types';
 import { storageService } from '../services/storageService';
 import { firebaseService } from '../services/firebaseService';
-import { emailService } from '../services/emailService';
 import { hashPassword, verifyPassword, generateStrongPassword } from '../utils/crypto';
 
 interface AdminPortalProps {
@@ -118,19 +117,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [isPurgingSampleData, setIsPurgingSampleData] = useState(false);
   const [purgeNotice, setPurgeNotice] = useState('');
 
-  // Email Service Configuration State
-  const [emailConfig, setEmailConfig] = useState<EmailConfig>(() => emailService.getEmailConfig());
-  const [testRecipientEmail, setTestRecipientEmail] = useState('');
-  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
-  const [emailTestNotice, setEmailTestNotice] = useState('');
-
   useEffect(() => {
     const acc = storageService.getAdminAccount();
     setAdminAccount(acc);
     setEditUsername(acc.username);
     setAllAdmins(storageService.getAllAdmins());
     setRegisteredUsers(storageService.getAllUsers());
-    setEmailConfig(emailService.getEmailConfig());
 
     // Fetch cloud admins in background
     firebaseService.getAdmins().then(cloudAdmins => {
@@ -235,36 +227,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setPurgeNotice(`⚠️ Error: ${e?.message || 'Purge failed'}`);
     } finally {
       setIsPurgingSampleData(false);
-    }
-  };
-
-  const handleSaveEmailConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    emailService.saveEmailConfig(emailConfig);
-    setEmailTestNotice('✅ Email Service Configuration saved successfully!');
-    setTimeout(() => setEmailTestNotice(''), 4000);
-  };
-
-  const handleSendTestEmail = async () => {
-    if (!testRecipientEmail.trim() || !testRecipientEmail.includes('@')) {
-      alert('Please enter a valid email address to send the test verification token.');
-      return;
-    }
-    setIsSendingTestEmail(true);
-    setEmailTestNotice('');
-    try {
-      const testOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      const res = await emailService.sendOtpEmail({
-        toEmail: testRecipientEmail.trim(),
-        toName: 'Admin Tester',
-        otp: testOtp
-      });
-      setEmailTestNotice(`✅ Test code dispatched to ${testRecipientEmail.trim()}! Please check your inbox and spam folder.`);
-      setTimeout(() => setEmailTestNotice(''), 6000);
-    } catch (e: any) {
-      setEmailTestNotice(`⚠️ Error: ${e?.message || 'Failed to dispatch test email'}`);
-    } finally {
-      setIsSendingTestEmail(false);
     }
   };
 
@@ -1122,58 +1084,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </div>
 
-                  {/* Section 5: Email Service & OTP Delivery Settings */}
-                  <div className="p-5 rounded-2xl bg-[#FAF2EB]/60 border border-[#F4E5DA] space-y-4 pt-4">
-                    <div className="flex items-center justify-between border-b border-[#F4E5DA] pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-[#D95F7F]" />
-                        <span className="font-bold text-xs text-[#3E1028]">Email Dispatch & OTP Token Delivery</span>
-                      </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold">
-                        Direct Inbox Delivery
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-[#5C1D3B]/70 leading-relaxed">
-                      Verification tokens are sent directly to contributor email addresses (Gmail, Outlook, Yahoo) when they register. Tokens are confidential and never displayed on-screen in the form.
-                    </p>
-
-                    {emailTestNotice && (
-                      <div className="p-3 rounded-xl bg-white border border-[#D95F7F]/30 text-xs font-semibold text-[#3E1028] flex items-center gap-2">
-                        <span>{emailTestNotice}</span>
-                      </div>
-                    )}
-
-                    {/* Test Email Dispatch Form */}
-                    <div className="p-3.5 rounded-xl bg-white border border-[#F4E5DA] space-y-2.5">
-                      <div className="text-[11px] font-bold text-[#3E1028] uppercase tracking-wider">
-                        Send Test 6-Digit Token to Your Gmail / Email
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-center gap-2">
-                        <input
-                          type="email"
-                          placeholder="Enter your email to receive test token..."
-                          value={testRecipientEmail}
-                          onChange={(e) => setTestRecipientEmail(e.target.value)}
-                          className="w-full px-3.5 py-2 rounded-xl bg-[#FAF2EB]/40 border border-[#F4E5DA] text-xs text-[#3E1028] focus:outline-none focus:ring-2 focus:ring-[#D95F7F]/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleSendTestEmail}
-                          disabled={isSendingTestEmail}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-[#D95F7F] hover:bg-[#BE4465] text-white text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          {isSendingTestEmail ? (
-                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Send className="w-3.5 h-3.5" />
-                          )}
-                          <span>{isSendingTestEmail ? 'Dispatching...' : 'Send Test Token'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
                 </div>
               </div>
             ) : activeTab === 'files' ? (
@@ -1197,7 +1107,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           </span>
                         </div>
                         <p className="text-xs text-[#5C1D3B]/70">
-                          Browse, preview, and download all PDF documents, Word files, and articles submitted by contributors.
+                          Browse, preview, and download all PDF documents and submissions by contributors.
                         </p>
                       </div>
                     </div>
@@ -1214,7 +1124,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
 
                   {/* Folder Categories Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button 
                       type="button"
                       onClick={() => setFolderFilter('all')}
@@ -1247,40 +1157,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </div>
                       <div className="text-xs font-bold text-[#3E1028] pt-2">PDF Documents</div>
                       <div className="text-[10px] text-slate-500">.pdf releases</div>
-                    </button>
-
-                    <button 
-                      type="button"
-                      onClick={() => setFolderFilter('word')}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-left w-full touch-manipulation active:scale-95 ${
-                        folderFilter === 'word'
-                          ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30'
-                          : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <FileText className="w-5 h-5 text-blue-600" />
-                        <span className="text-xs font-mono font-bold text-blue-700">{wordCount}</span>
-                      </div>
-                      <div className="text-xs font-bold text-[#3E1028] pt-2">Word Files</div>
-                      <div className="text-[10px] text-slate-500">.docx & .doc docs</div>
-                    </button>
-
-                    <button 
-                      type="button"
-                      onClick={() => setFolderFilter('article')}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer text-left w-full touch-manipulation active:scale-95 ${
-                        folderFilter === 'article'
-                          ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/30'
-                          : 'bg-[#FAF2EB]/60 hover:bg-[#FAF2EB] border-[#F4E5DA]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <BookOpen className="w-5 h-5 text-amber-600" />
-                        <span className="text-xs font-mono font-bold text-amber-700">{articleCount}</span>
-                      </div>
-                      <div className="text-xs font-bold text-[#3E1028] pt-2">Articles & Stories</div>
-                      <div className="text-[10px] text-slate-500">Editorial writings</div>
                     </button>
                   </div>
                 </div>
