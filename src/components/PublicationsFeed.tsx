@@ -262,7 +262,7 @@ export const PublicationsFeed: React.FC<PublicationsFeedProps> = ({
               No Live Publications Yet
             </h3>
             <p className="text-xs text-[#5C1D3B]/70 max-w-md mx-auto leading-relaxed">
-              Upload a <strong>PDF document</strong>, <strong>Word file (.docx)</strong>, <strong>3D Flipbook</strong>, or <strong>written blog</strong>. Once approved by the admin, it will be published live here!
+              Submit your Word documents & articles. Please convert or save your file as a <strong>PDF (.pdf)</strong> before submitting. Once approved by the admin, it will be published live here!
             </p>
             <div className="pt-2">
               <button

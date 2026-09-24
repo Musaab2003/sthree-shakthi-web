@@ -6,7 +6,9 @@ import {
   CheckCircle2, 
   Upload,
   FileType,
-  Trash2
+  Trash2,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { Publication, PublicationType, UserAccount } from '../types';
 
@@ -67,8 +69,18 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
     }
 
     const lowerName = file.name.toLowerCase();
+    const isWord = lowerName.endsWith('.docx') || lowerName.endsWith('.doc') || file.type.includes('word') || file.type.includes('officedocument') || file.type.includes('msword');
+    
+    if (isWord) {
+      alert(`⚠️ Word Document Selected: "${file.name}"\n\nPlease convert or save this document as a PDF (.pdf) before submitting:\n\n1. Open your document in Microsoft Word\n2. Click "File" > "Save As" (or "Export" > "Create PDF/XPS")\n3. Select PDF (*.pdf) format and save\n4. Upload the saved PDF file here.`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     if (!lowerName.endsWith('.pdf') && file.type !== 'application/pdf') {
-      alert('Please upload a PDF document (.pdf). Only PDF format is accepted for publication.');
+      alert('Please upload a PDF document (.pdf). If your article is in Word (.docx / .doc), please convert/save it as a PDF before uploading.');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -240,6 +252,22 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
             /* Submission Form */
             <form onSubmit={handleSubmit} className="space-y-5">
               
+              {/* Word to PDF Conversion Guidance Notice */}
+              <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 flex items-start gap-3 text-xs text-amber-950 shadow-2xs">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5 flex-wrap">
+                    <span>Submitting a Word Document (.docx / .doc)?</span>
+                    <span className="px-2 py-0.2 bg-amber-200/80 text-amber-900 rounded-full text-[9px] font-black uppercase tracking-wider">
+                      Save as PDF
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Please convert or save your Word article as a <strong>PDF (.pdf)</strong> before submitting (In Microsoft Word: go to <em>File &gt; Save As &gt; PDF (*.pdf)</em>). Only PDF files are accepted for publication.
+                  </p>
+                </div>
+              </div>
+
               {/* PDF Document Attachment Section */}
               <div className="p-4 rounded-2xl bg-white border border-[#F4E5DA] space-y-3">
                 <div className="flex items-center justify-between">
@@ -282,7 +310,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept=".pdf,application/pdf"
+                        accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
                         onChange={handleFileChange}
                         className="hidden"
                       />
@@ -293,7 +321,7 @@ export const SubmitPublicationModal: React.FC<SubmitPublicationModalProps> = ({
                         Click to select your PDF document (.pdf)
                       </div>
                       <div className="text-[10px] text-[#5C1D3B]/60">
-                        Supports PDF files up to 25MB with high-speed rendering
+                        Supports PDF files up to 25MB • If written in Word, please export to PDF first
                       </div>
                     </div>
                   )}
