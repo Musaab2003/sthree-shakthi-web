@@ -231,13 +231,33 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className="pt-3 border-t border-[#F4E5DA] flex flex-col gap-2.5">
             {currentUser ? (
-              <button
-                onClick={() => { setMobileMenuOpen(false); onOpenDashboard(); }}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full font-bold text-[#3E1028] bg-white border border-[#F4E5DA] text-xs shadow-2xs"
-              >
-                <LayoutDashboard className="w-4 h-4 text-[#D95F7F]" />
-                <span>My Submissions & Dashboard ({currentUser.name})</span>
-              </button>
+              <>
+                {onOpenNotifications && (
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); onOpenNotifications(); }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-full font-bold text-[#3E1028] bg-white border border-[#F4E5DA] text-xs shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-[#D95F7F]" />
+                      <span>Notifications & Feedback</span>
+                    </div>
+                    {unreadNotificationsCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black">
+                        {unreadNotificationsCount} new
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-semibold">0 unread</span>
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => { setMobileMenuOpen(false); onOpenDashboard(); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-full font-bold text-[#3E1028] bg-white border border-[#F4E5DA] text-xs shadow-2xs"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-[#D95F7F]" />
+                  <span>My Submissions & Dashboard ({currentUser.name})</span>
+                </button>
+              </>
             ) : (
               <button
                 onClick={() => { setMobileMenuOpen(false); onOpenAuthModal(); }}

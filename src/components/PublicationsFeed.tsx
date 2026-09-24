@@ -69,10 +69,10 @@ export const PublicationsFeed: React.FC<PublicationsFeedProps> = ({
               <span>Community Publications</span>
             </div>
             <h2 className="font-serif text-3xl sm:text-5xl font-bold text-[#3E1028] tracking-tight">
-              PDF Documents & <span className="italic font-normal text-[#D95F7F]">Word Articles</span>
+              PDF Documents & <span className="italic font-normal text-[#D95F7F]">Publications</span>
             </h2>
             <p className="text-sm sm:text-base text-[#5C1D3B]/80 leading-relaxed font-normal">
-              Explore community-submitted PDF resources, project documents, and Word articles published across Cluster 05.
+              Explore community-submitted PDF resources, project documents, and publications across Cluster 05.
             </p>
           </div>
 
@@ -223,17 +223,6 @@ export const PublicationsFeed: React.FC<PublicationsFeedProps> = ({
               >
                 <FileText className="w-3.5 h-3.5" />
                 PDFs ({publications.filter(p => p.type === 'pdf' || p.type === 'drive').length})
-              </button>
-              <button
-                onClick={() => setSelectedType('word')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-                  selectedType === 'word'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-[#FAF2EB]/60 text-[#5C1D3B] hover:bg-[#FAF2EB]'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Word Docs ({publications.filter(p => p.type === 'word').length})
               </button>
             </div>
 
